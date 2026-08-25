@@ -1,0 +1,22 @@
+{
+    "deploy": [
+        "../deploy.md"
+    ],
+    "docs": "",
+    "features": [
+        "MIPI_CSI",
+        "OV5647",
+        "MIPI_DSI",
+        "EK79007",
+        "SDMMC",
+        "Ethernet",
+        "WiFi",
+        "Audio",
+        "USB_Host"
+    ],
+    "mcu": "esp32p4x",
+    "product": "WT9932P4C5-S1",
+    "thumbnail": "",
+    "url": "https://www.wireless-tag.com",
+    "vendor": "Wireless-Tag"
+}

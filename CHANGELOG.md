@@ -6,6 +6,7 @@ All notable changes to ESP-VISION are recorded here. The format follows [Keep a 
 
 ### Added
 
+- Added the `WT9932P4C5-S1` ESP32-P4 board definition with OV5647 MIPI-CSI camera, 1024x600 MIPI-DSI display, SD card, USB MSC, and optional 1D barcode support; the initial P4-only configuration keeps the external ESP32-C5 Wi-Fi path disabled.
 - Added the shared ESP-DL PicoDet pedestrian model, an `espdl.PedestrianDetect` wrapper with model-specific preprocessing and post-processing, Python stubs, and a camera example for ESP32-P4/S31/S3 boards.
 - Added a button-triggered PP-OCRv6 pipeline with separate INT8 text detection and recognition stages, Python detection/CTC post-processing, and generic BGR preprocessing through `espdl.Model`.
 - Added ESP32-S3 USB-OTG CDC automatic download-mode entry using the esptool USB-Serial/JTAG DTR/RTS sequence, controlled per board from `mpconfigboard.h` and handled outside the MicroPython VM. The existing EV-MUX CDC stack now starts before camera initialization, filesystem recovery, and `boot.py`; its transport task keeps the download path responsive while the VM is busy without introducing a second USB driver or descriptor owner.
@@ -14,6 +15,7 @@ All notable changes to ESP-VISION are recorded here. The format follows [Keep a 
 
 ### Changed
 
+- Pinned `espressif/esp_hosted` to 2.12.6 in the ESP-IDF 5.5, 6.0, and 6.1 component overlays.
 - Added periodic MicroPython event polling to long-running imlib drawing, filtering, feature-detection, QR, statistics, and template-matching loops.
 - Synchronized the MicroPython Wi-Fi authentication constants with the native and remote Wi-Fi backends in ESP-IDF 6.0 and 6.1.
 - Updated `esp_wifi_remote` to 1.6.4 for every supported ESP-IDF release overlay.
