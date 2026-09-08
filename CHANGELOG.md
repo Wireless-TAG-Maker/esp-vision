@@ -2,6 +2,14 @@
 
 All notable changes to ESP-VISION are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/); each released version corresponds to a git tag. Unreleased changes accumulate at the top and are folded into the next tag at release time.
 
+## [Unreleased]
+
+### Added
+
+- Added the `ESP32_WT9932P4C61_TINY` board definition for Wireless-Tag WT9932P4C61-TINY, with an SC2336 CSI camera, ST7102 480x640 DSI display, ESP32-C61 SDIO Wi-Fi, four-bit SDMMC storage with LDO4 enabled, USB CDC/MSC, and a default camera preview on LCD and USB.
+- Added board-local exFAT support through a FatFs build copy, a bounded DSI panel ID read, and an IDF 6.0 LCD DMA teardown adaptation for repeated display initialization while the camera remains active.
+- Added an EV-MUX hardware smoke test with exclusive temporary files and SD reads after 250/1000/3000 ms idle, plus board setup, licensing, and validation records. All seven smoke checks passed with the installed 64 GB exFAT card, along with HUSB CDC/MSC, Web IDE script execution/preview, and continuous Hand Detect inference; positive hand recognition remains unverified because no hand was visible during the observation.
+
 ## [2026.08.27]
 
 ### Added

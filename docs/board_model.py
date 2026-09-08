@@ -30,6 +30,7 @@ WEBSITE_STATIC_PREFIX = (
 )
 
 BOARD_IMAGES = {
+    'ESP32_WT9932P4C61_TINY': '../../_static/ESP-VISION_logo.svg',
     'ESP32_P4X_EYE': (
         'https://raw.githubusercontent.com/espressif/esp-dev-kits/master/'
         'docs/_static/esp32-p4-eye/esp32-p4-eye-isometric.png'

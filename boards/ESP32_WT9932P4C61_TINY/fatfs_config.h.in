@@ -1,0 +1,25 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#pragma once
+
+/* Read the SDK defaults from the installed header, then override only the
+ * generated FatFs core's configuration. No SDK source is modified. */
+#include "@wt_fatfs_source_dir@/ffconf.h"
+
+#if !defined(_FFCONF_DEFINED) || FF_USE_LFN == 0
+#error "WT9932P4C61-TINY exFAT requires guarded ESP-IDF ffconf.h and long filenames"
+#endif
+
+#undef FF_FS_EXFAT
+#define FF_FS_EXFAT 1
+
+/* The exFAT reader uses this option in a C expression as well as #if.
+ * Disabled sdkconfig booleans are otherwise undefined identifiers. */
+#if !FF_USE_LABEL
+#undef FF_USE_LABEL
+#define FF_USE_LABEL 0
+#endif

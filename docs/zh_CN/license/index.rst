@@ -64,6 +64,18 @@ ESP-VISION 自有代码（``platform/``、大部分 ``modules/``、``boards/`` �
      - 外部 SDK
      - 构建系统、驱动和媒体组件
      - Apache-2.0
+   * - ESP-IDF 内置的 FatFs R0.15
+     - 外部 SDK；WT9932P4C61-TINY 在构建时生成副本
+     - FAT/exFAT 文件系统核心；保留源文件声明
+     - FatFs 宽松许可条款（ChaN）
+   * - `esp_lcd_st7102 1.0.0 <https://components.espressif.com/components/kevincoooool/esp_lcd_st7102/versions/1.0.0>`__
+     - Component Registry，仅 WT9932P4C61-TINY 使用
+     - ST7102 MIPI-DSI 屏幕驱动
+     - Apache-2.0（已逐一核对 1.0.0 源文件）
+   * - `WT_BSP 9d1050d <https://github.com/Wireless-TAG-Maker/WT_BSP/tree/9d1050d0957aaa050e635ff1f22a686881e54444>`__
+     - ``boards/ESP32_WT9932P4C61_TINY/bmgr/st7102_init.h``
+     - 480x640 屏幕命令表，保留原始版权声明
+     - Apache-2.0
 
 如何理解许可证
 --------------

@@ -1,0 +1,21 @@
+{
+    "deploy": [
+        "../deploy.md"
+    ],
+    "docs": "",
+    "features": [
+        "ISP",
+        "MIPI_CSI",
+        "SC2336",
+        "MIPI_DSI",
+        "ST7102",
+        "WiFi",
+        "SDCard",
+        "USB"
+    ],
+    "mcu": "esp32p4",
+    "product": "WT9932P4C61-TINY",
+    "thumbnail": "",
+    "url": "",
+    "vendor": "Wireless-Tag"
+}

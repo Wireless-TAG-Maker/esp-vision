@@ -74,3 +74,13 @@ idf.py --board ESP32_P4X_EYE -p /dev/ttyACM0 build flash monitor
 - [示例](example/)
 - [客制化固件功能](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/esp32p4/how-to/customize-firmware.html)
 - [方案架构与许可证](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/esp32p4/architecture/index.html)
+
+## WT9932P4C61-TINY
+
+使用 ESP-IDF 6.0 执行 `idf.py --board ESP32_WT9932P4C61_TINY build`。引脚、USB 接口和 ESP32-C61 从机固件要求见[板级说明](boards/ESP32_WT9932P4C61_TINY/port/board.md)。
+
+| 板级依赖 | 用途 | 许可证 |
+| --- | --- | --- |
+| `kevincoooool/esp_lcd_st7102` 1.0.0 | 从组件仓库加载的 ST7102 DSI 屏幕驱动 | Apache-2.0；已逐一核对 1.0.0 的 C/H 文件 |
+| WT_BSP `9d1050d` 屏幕命令表 | WT9932P4C61-TINY 480x640 屏幕初始化 | Apache-2.0；`bmgr/st7102_init.h` 保留原始版权声明 |
+| ESP-IDF FatFs R0.15 核心 | 构建时生成副本，为本板启用 exFAT | FatFs 宽松许可条款；保留 SDK 源文件声明 |

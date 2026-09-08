@@ -64,6 +64,18 @@ The following table lists the direct dependencies most relevant to redistributio
      - External SDK
      - Build system, drivers, and media components
      - Apache-2.0
+   * - FatFs R0.15 bundled with ESP-IDF
+     - External SDK; WT9932P4C61-TINY generates a build copy
+     - FAT/exFAT filesystem core; source notices retained
+     - FatFs permissive terms (ChaN)
+   * - `esp_lcd_st7102 1.0.0 <https://components.espressif.com/components/kevincoooool/esp_lcd_st7102/versions/1.0.0>`__
+     - Component Registry, WT9932P4C61-TINY only
+     - ST7102 MIPI-DSI panel driver
+     - Apache-2.0 (verified per source file in 1.0.0)
+   * - `WT_BSP 9d1050d <https://github.com/Wireless-TAG-Maker/WT_BSP/tree/9d1050d0957aaa050e635ff1f22a686881e54444>`__
+     - ``boards/ESP32_WT9932P4C61_TINY/bmgr/st7102_init.h``
+     - 480x640 panel command table; original source notice retained
+     - Apache-2.0
 
 How to Interpret the Licenses
 -----------------------------
