@@ -74,3 +74,11 @@ idf.py --board ESP32_P4X_EYE -p /dev/ttyACM0 build flash monitor
 - [Examples](example/)
 - [Customize firmware features](https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/how-to/customize-firmware.html)
 - [Solution architecture and licensing](https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/architecture/index.html)
+
+## WT9932S31-TINY
+
+Use `idf.py --board ESP32_WT9932S31_TINY build` with ESP-IDF release/v6.1. See the [board guide](boards/ESP32_WT9932S31_TINY/port/board.md) for the GC2145 camera, SD storage, USB connections, and memory constraints.
+
+| Board-specific source | Purpose | License |
+| --- | --- | --- |
+| Wireless-Tag GC2145 UXGA helper | Derive the validated UYVY sensor configuration | Apache-2.0; original notices retained |

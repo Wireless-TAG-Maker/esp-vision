@@ -64,6 +64,10 @@ The following table lists the direct dependencies most relevant to redistributio
      - External SDK
      - Build system, drivers, and media components
      - Apache-2.0
+   * - Wireless-Tag GC2145 UXGA helper
+     - ``boards/ESP32_WT9932S31_TINY/gc2145_uxga.c`` and ``.h``
+     - UYVY sensor format derived from the camera reference; original notices retained
+     - Apache-2.0
 
 How to Interpret the Licenses
 -----------------------------

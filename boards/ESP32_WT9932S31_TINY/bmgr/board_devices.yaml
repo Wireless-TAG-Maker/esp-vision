@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
+# SPDX-License-Identifier: Apache-2.0
+
+version: 1.0.0
+devices:
+  - name: camera
+    type: camera
+    sub_type: dvp
+    version: default
+    init_skip: true
+    config:
+      dvp_config:
+        reset_io: -1
+        pwdn_io: -1
+        vsync_io: 56
+        data_width: CAM_CTLR_DATA_WIDTH_8
+        de_io: 57
+        pclk_io: 54
+        xclk_io: 55
+        xclk_freq: 20000000
+        data_io:
+          data_io_0: 46
+          data_io_1: 47
+          data_io_2: 48
+          data_io_3: 49
+          data_io_4: 50
+          data_io_5: 51
+          data_io_6: 52
+          data_io_7: 53
+    peripherals:
+      - name: i2c_master
+        frequency: 100000

@@ -2,6 +2,18 @@
 
 All notable changes to ESP-VISION are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/); each released version corresponds to a git tag. Unreleased changes accumulate at the top and are folded into the next tag at release time.
 
+## [Unreleased]
+
+### Added
+
+- Added the `ESP32_WT9932S31_TINY` board profile for Wireless-Tag WT9932S31-TINY, with GC2145 DVP camera configuration, USB preview, native USB CDC/MSC, and four-bit SDMMC storage using the S31's fixed 1.8 V IO LDO. The port uses the existing ESP-IDF 6.1 dependency overlay and explicitly selects Newlib for C stdout/stderr routing through EV-MUX.
+- Added a WT9932S31-TINY hardware smoke test covering camera formats and repeated startup, PSRAM, Flash/SD readback after idle, Wi-Fi scanning, and board GPIO access, with PSRAM heap traversal checks, exclusive temporary files, and startup serial synchronization.
+
+### Fixed
+
+- Reject duplicate SDMMC ownership on WT9932S31-TINY before initializing the host, so garbage collection of a failed `machine.SDCard(slot=0)` object cannot disable the automatically mounted SD card.
+- Allow ESP32-S31 boards to enable native USB CDC and USB-Serial/JTAG together, matching their independent PHYs while retaining the shared-PHY restriction on other single-OTG targets.
+
 ## [2026.08.27]
 
 ### Added

@@ -1,0 +1,10 @@
+{
+    "deploy": ["../deploy.md"],
+    "docs": "",
+    "features": ["WiFi", "USB 2.0 High Speed", "SDCard"],
+    "mcu": "esp32s31",
+    "product": "WT9932S31-TINY",
+    "thumbnail": "",
+    "url": "",
+    "vendor": "Wireless-Tag"
+}

@@ -324,7 +324,8 @@
 #define MICROPY_HW_ESP_USB_SERIAL_JTAG      (0)
 #endif
 
-#if MICROPY_HW_USB_CDC && MICROPY_HW_ESP_USB_SERIAL_JTAG && (SOC_USB_OTG_PERIPH_NUM <= 1)
+// S31 has one OTG controller with a dedicated UTMI PHY, independent of USJ.
+#if MICROPY_HW_USB_CDC && MICROPY_HW_ESP_USB_SERIAL_JTAG && (SOC_USB_OTG_PERIPH_NUM <= 1) && !CONFIG_IDF_TARGET_ESP32S31
 #error "Invalid build config: Can't enable both native USB and USB Serial/JTAG peripheral"
 #endif
 // type definitions for the specific machine
