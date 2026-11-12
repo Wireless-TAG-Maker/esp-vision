@@ -5,6 +5,9 @@
  */
 
 #include "camera.h"
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL
+#include "camera_isp.h"
+#endif
 
 #include <fcntl.h>
 #include <inttypes.h>
@@ -25,6 +28,7 @@
 #include "sys/mman.h"
 
 #include "boardconfig.h"
+#include "ev_memory.h"
 
 #ifndef CMSIS_MCU_H
 #define CMSIS_MCU_H "cmsis_compiler.h"
@@ -64,6 +68,12 @@ typedef struct {
     ppa_client_handle_t ppa_handle;
     uint8_t *ppa_out_buf;
     const char *device_path;
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL
+    const char *isp_device_path;
+#endif
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL && CONFIG_ESP_VIDEO_ENABLE_ISP_PIPELINE_CONTROLLER
+    const void *ipa_config;
+#endif
     esp_vision_camera_buffer_t buffers[ESP_VISION_CAMERA_BUFFER_COUNT];
 } esp_vision_camera_context_t;
 
@@ -85,6 +95,10 @@ static void esp_vision_camera_set_defaults(void)
 
 void esp_vision_camera_init0(void)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return;
+    }
+    esp_vision_camera_invalidate_observed_frame();
     esp_vision_camera_deinit();
     memset(&s_camera, 0, sizeof(s_camera));
     esp_vision_camera_set_defaults();
@@ -185,15 +199,37 @@ static esp_err_t esp_vision_camera_video_init(void)
 
     s_camera.device_path = camera->dev_path;
     s_camera.video_initialized = true;
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL
+    s_camera.isp_device_path = camera->meta_path;
+#endif
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL && CONFIG_ESP_VIDEO_ENABLE_ISP_PIPELINE_CONTROLLER
+    s_camera.ipa_config = NULL;
+    ret = esp_vision_video_isp_lookup_ipa(camera->dev_path, camera->meta_path, &s_camera.ipa_config);
+    ESP_RETURN_ON_ERROR(ret, TAG, "failed to get camera IPA configuration");
+#endif
     return ESP_OK;
 }
 
 static void esp_vision_camera_video_deinit(void)
 {
     if (s_camera.video_initialized) {
-        (void)esp_board_manager_deinit_device_by_name(ESP_BOARD_DEVICE_NAME_CAMERA);
+        esp_err_t ret = esp_board_manager_deinit_device_by_name(ESP_BOARD_DEVICE_NAME_CAMERA);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "failed to deinitialize camera: %s", esp_err_to_name(ret));
+        }
+        // A failed deinit may leave the ISP pointing at the LSC tables, so only
+        // free them once the device is known to be gone.
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL
+        esp_vision_video_isp_release(ret == ESP_OK);
+#endif
         s_camera.device_path = NULL;
         s_camera.video_initialized = false;
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL
+        s_camera.isp_device_path = NULL;
+#endif
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL && CONFIG_ESP_VIDEO_ENABLE_ISP_PIPELINE_CONTROLLER
+        s_camera.ipa_config = NULL;
+#endif
     }
 }
 
@@ -287,16 +323,10 @@ static esp_err_t esp_vision_camera_init_ppa(void)
     ESP_RETURN_ON_ERROR(ret, TAG, "failed to register PPA client");
 
     s_camera.ppa_out_size = esp_vision_camera_align_up(out_size, cache_align);
-    s_camera.ppa_out_buf = heap_caps_aligned_calloc(cache_align,
-                                                    1,
-                                                    s_camera.ppa_out_size,
-                                                    MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
-    if (s_camera.ppa_out_buf == NULL) {
-        s_camera.ppa_out_buf = heap_caps_aligned_calloc(cache_align,
-                                                        1,
-                                                        s_camera.ppa_out_size,
-                                                        MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
-    }
+    s_camera.ppa_out_buf = esp_vision_memory_aligned_calloc(cache_align,
+                                                            1,
+                                                            s_camera.ppa_out_size,
+                                                            MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
     if (s_camera.ppa_out_buf == NULL) {
         esp_vision_camera_release_ppa();
         return ESP_ERR_NO_MEM;
@@ -430,6 +460,9 @@ static void esp_vision_camera_cleanup(void)
 
 esp_err_t esp_vision_camera_init(void)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
     esp_err_t ret;
 
     if (s_camera.initialized) {
@@ -496,6 +529,10 @@ fail:
 
 void esp_vision_camera_deinit(void)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return;
+    }
+    esp_vision_camera_invalidate_observed_frame();
     esp_vision_camera_cleanup();
 }
 
@@ -512,6 +549,12 @@ bool esp_vision_camera_is_ready(void)
 
 esp_err_t esp_vision_camera_set_pixformat(uint32_t pixfmt)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (pixfmt != esp_vision_camera_get_pixformat()) {
+        esp_vision_camera_invalidate_observed_frame();
+    }
     if ((pixfmt != PIXFORMAT_RGB565) && (pixfmt != PIXFORMAT_GRAYSCALE)) {
         return ESP_ERR_NOT_SUPPORTED;
     }
@@ -534,6 +577,16 @@ uint32_t esp_vision_camera_get_pixformat(void)
 
 esp_err_t esp_vision_camera_set_framesize(esp_vision_camera_framesize_t framesize)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    uint32_t observed_width = 0;
+    uint32_t observed_height = 0;
+    if ((esp_vision_camera_get_framesize_dimensions(framesize, &observed_width, &observed_height) == ESP_OK) &&
+            ((observed_width != esp_vision_camera_get_width()) ||
+             (observed_height != esp_vision_camera_get_height()))) {
+        esp_vision_camera_invalidate_observed_frame();
+    }
     uint32_t width = 0;
     uint32_t height = 0;
     esp_err_t ret = esp_vision_camera_get_framesize_dimensions(framesize, &width, &height);
@@ -565,6 +618,12 @@ uint32_t esp_vision_camera_get_height(void)
 
 esp_err_t esp_vision_camera_set_hmirror(bool enable)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (enable != esp_vision_camera_get_hmirror()) {
+        esp_vision_camera_invalidate_observed_frame();
+    }
     s_camera.hmirror = enable;
     return ESP_OK;
 }
@@ -576,6 +635,12 @@ bool esp_vision_camera_get_hmirror(void)
 
 esp_err_t esp_vision_camera_set_vflip(bool enable)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (enable != esp_vision_camera_get_vflip()) {
+        esp_vision_camera_invalidate_observed_frame();
+    }
     s_camera.vflip = enable;
     return ESP_OK;
 }
@@ -584,6 +649,69 @@ bool esp_vision_camera_get_vflip(void)
 {
     return s_camera.vflip;
 }
+
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL && CONFIG_ESP_VIDEO_ENABLE_ISP_PIPELINE_CONTROLLER
+esp_err_t esp_vision_camera_get_ipa(bool *enabled)
+{
+    return esp_vision_video_isp_get_controller(esp_vision_camera_is_ready(), s_camera.ipa_config, enabled);
+}
+
+esp_err_t esp_vision_camera_set_ipa(bool enable)
+{
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    bool enabled;
+    esp_err_t ret = esp_vision_camera_get_ipa(&enabled);
+    if ((ret != ESP_OK) || (enabled == enable)) {
+        return ret;
+    }
+
+    // Stop/reopen may partially change the camera even when it fails. Never
+    // retain a publication (or allocation-failure latch) across that change.
+    esp_vision_camera_invalidate_observed_frame();
+    const esp_vision_camera_restart_ops_t ops = {
+        .release_buffers = esp_vision_camera_release_buffers,
+        .open_device = esp_vision_camera_open_device,
+        .set_input_format = esp_vision_camera_set_input_format,
+        .update_active_window = esp_vision_camera_update_active_window,
+        .init_buffers = esp_vision_camera_init_buffers,
+        .start_stream = esp_vision_camera_start_stream,
+        .cleanup = esp_vision_camera_cleanup,
+    };
+    return esp_vision_video_isp_set_controller(enable, &s_camera.fd, &s_camera.streaming, &s_camera.initialized,
+                                               s_camera.isp_device_path, s_camera.device_path, s_camera.ipa_config, &ops);
+}
+#endif
+
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL
+esp_err_t esp_vision_camera_get_isp(esp_vision_isp_block_t block, esp_vision_isp_config_t *config)
+{
+    if (!esp_vision_camera_is_ready()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (config == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    return esp_vision_video_isp_get(s_camera.fd, s_camera.isp_device_path, block, config);
+}
+
+esp_err_t esp_vision_camera_set_isp(esp_vision_isp_block_t block, const esp_vision_isp_config_t *config)
+{
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!esp_vision_camera_is_ready()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (esp_vision_video_isp_controller_active()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    // A manual ISP write may apply only part of a configuration before error.
+    esp_vision_camera_invalidate_observed_frame();
+    return esp_vision_video_isp_set(s_camera.fd, s_camera.isp_device_path, block, config);
+}
+#endif
 
 uint32_t esp_vision_camera_get_sensor_id(void)
 {
@@ -595,8 +723,11 @@ size_t esp_vision_camera_frame_size(void)
     return esp_vision_camera_output_size(s_camera.width, s_camera.height, s_camera.output_pixfmt);
 }
 
-esp_err_t esp_vision_camera_capture(uint8_t *pixels, size_t pixels_size)
+esp_err_t esp_vision_camera_capture_into(uint8_t *pixels, size_t pixels_size)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
     struct v4l2_buffer buf;
     bool dequeued = false;
     esp_err_t ret;

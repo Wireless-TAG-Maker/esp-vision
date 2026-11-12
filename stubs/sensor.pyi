@@ -32,6 +32,29 @@ class SensorStatus(TypedDict):
     active_height: int
 
 
+class IPAAWBStats(TypedDict):
+    counted: int
+    sum_r: int
+    sum_g: int
+    sum_b: int
+
+
+class IPAAFStats(TypedDict):
+    definition: int
+    luminance: int
+
+
+class IPAStats(TypedDict):
+    seq: int
+    flags: int
+    ae: list[list[int]] | None
+    awb: IPAAWBStats | None
+    awb_subwin: list[list[IPAAWBStats]] | None
+    hist: list[int] | None
+    sharpen: int | None
+    af: list[IPAAFStats] | None
+
+
 #: Reset and initialize the camera with the board default sensor configuration.
 def reset() -> None: ...
 #: Stop or restart the camera stream.
@@ -63,11 +86,40 @@ def get_hmirror() -> bool: ...
 def set_vflip(enable: bool) -> None: ...
 #: Return whether vertical flip is enabled.
 def get_vflip() -> bool: ...
+#: Optional API: present only in firmware with IPA/ISP control enabled.
+#: Start or stop the IPA controller after camera initialization; briefly pauses capture.
+#: Existing ISP tuning is retained when disabled; enabling returns configured blocks to IPA.
+#: IPA controls only algorithms declared in its active JSON configuration and supported by the backend.
+#: Sensor-side automatic exposure/white balance is independent. Unsupported cameras raise OSError.
+#: OV2710 exposure/gain remain sensor-controlled when IPA is stopped; manual controls stay unsupported.
+def set_ipa(enable: bool) -> None: ...
+#: Optional API: present only in firmware with IPA/ISP control enabled.
+#: Return the IPA controller state, or None when runtime control is unsupported.
+#: A supported camera must be initialized first.
+def get_ipa() -> bool | None: ...
+#: Optional API: collect one new statistics packet while IPA is running.
+#: timeout: 1..1000 milliseconds; None means timeout or unsupported backend.
+#: Uninitialized/stopped cameras or disabled IPA raise OSError.
+#: AE and AWB subwindow grids use [x][y]; unavailable blocks are None.
+def get_ipa_stats(timeout: int = 1000) -> IPAStats | None: ...
+#: Optional API: present only in firmware with IPA/ISP control enabled.
+#: Read current ISP block parameters, or None if unsupported. Initialize the camera first.
+#: Blocks the camera driver or chip revision does not implement return None,
+#: including "exposure" on sensors whose driver makes it write-only.
+#: Readback is driver configuration, not a frame commit barrier or sensor-side AWB gains.
+#: OV2710 does not support manual exposure or pixel_gain reads or writes.
+def get_isp(block: str) -> dict[str, Any] | None: ...
+#: Optional API: present only in firmware with IPA/ISP control enabled.
+#: Update one ISP block using keyword parameters; unspecified fields retain their values.
+#: Disable IPA before writing. Invalid parameters raise ValueError; device errors raise OSError.
+#: BF level is 2..20; use enable=False to disable filtering.
+#: Consume queued frames before evaluating a change; skip_frames is not a hardware commit barrier.
+def set_isp(block: str, **params: Any) -> None: ...
 #: Drop frames while camera exposure and processing settle.
 #: time: milliseconds to wait. n: number of frames to skip.
 def skip_frames(time: int = 0, n: int = 0) -> None: ...
 #: Capture one image from the camera.
-#: buffer: reserved for compatibility; pass None in current ESP-VISION builds.
-def snapshot(buffer: Any | None = None) -> Image: ...
+#: buffer: optional writable buffer of at least the configured frame size. The returned Image retains it.
+def snapshot(buffer: Any | None = None, /) -> Image: ...
 #: Return camera readiness, size, format, mirror, flip, and crop status.
 def status() -> SensorStatus: ...

@@ -1,8 +1,14 @@
 <p align="center">
-  <img src="docs/_static/ESP-VISION_logo.svg" alt="ESP-VISION logo" width="100%" height="240">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/_static/ESP-VISION_logo_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/_static/ESP-VISION_logo.svg">
+    <img src="docs/_static/ESP-VISION_logo_adaptive.svg" alt="ESP-VISION logo" width="960">
+  </picture>
 </p>
 
 # ESP-VISION
+
+[![Device Core npm version](https://img.shields.io/npm/v/%40esp-vision%2Fdevice-core?logo=npm&label=Device%20Core)](https://www.npmjs.com/package/@esp-vision/device-core) [![Device CLI npm version](https://img.shields.io/npm/v/%40esp-vision%2Fdevice-cli?logo=npm&label=Device%20CLI)](https://www.npmjs.com/package/@esp-vision/device-cli) [![Knowledge MCP npm version](https://img.shields.io/npm/v/%40esp-vision%2Fknowledge-mcp?logo=npm&label=Knowledge%20MCP)](https://www.npmjs.com/package/@esp-vision/knowledge-mcp) [![Plugin npm version](https://img.shields.io/npm/v/%40esp-vision%2Fplugin?logo=npm&label=Plugin)](https://www.npmjs.com/package/@esp-vision/plugin) [![License](https://img.shields.io/github/license/espressif/esp-vision?label=License)](LICENSE)
 
 **Low-Code Edge AI & Computer Vision Framework for Espressif SoCs**
 
@@ -16,22 +22,53 @@ ESP-VISION is a Low-Code Edge AI & Computer Vision Framework for Espressif SoCs.
 - Image processing capabilities covering drawing, filtering, color tracking, feature detection, QR codes, barcodes, and AprilTags.
 - ESP-DL-powered AI inference for object detection, pose estimation, and image classification, with a streamlined path for deploying models to edge devices.
 - Efficient C/C++ foundation components work closely with on-chip multimedia peripherals and hardware acceleration modules to deliver high-performance, real-time application execution.
-- Development through a VSCode-based host tool or [Web IDE](https://ide.vision.espressif.com/), with firmware builds managed through `idf.py`.
+- Develop with a VSCode-based host tool, [Web IDE](https://ide.vision.espressif.com/), standalone [Device CLI](host/device-cli/README.md), or supported AI clients through the official [plugin](host/esp-vision-plugin/README.md); manage firmware builds through `idf.py`.
 
 **Document Center**:
 
 - [中文](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/)
 - [English](https://docs.espressif.com/projects/esp-vision/en/latest/)
 
+## EV-MUX: Host Communication
+
+EV-MUX v4 provides IDEs, host tools and independent Agent adapters with discovery, control, framed Python interaction and JPEG preview. Board-enabled `usj`, `usb`, `uart` and `tcp` links share one owner session, which owns both user/debug streams.
+
+The [Communication System and EV-MUX chapter](docs/en/communication/index.rst) is the detailed reference for [console/log architecture](docs/en/communication/architecture.rst), [interfaces and board configuration](docs/en/communication/interfaces.rst), [ownership and recovery](docs/en/communication/sessions.rst), [wire protocol](docs/en/communication/wire-protocol.rst), files, preview, Wi-Fi provisioning and acceptance.
+
+v4 still uses `EVMUX/1` framing. Hosts must implement explicit acquisition and keepalive; `route.bind`/`route.auto` are unsupported. Runtime `capabilities` determines available interfaces. TCP has no authentication or encryption in this implementation.
+
 ## Architecture
 
-![ESP-VISION layered architecture](docs/_static/esp-vision-architecture.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/_static/esp-vision-architecture.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/_static/esp-vision-architecture-light.svg">
+  <img src="docs/_static/esp-vision-architecture-adaptive.svg" alt="ESP-VISION layered architecture" width="960" height="1048">
+</picture>
 
-See [Solution architecture and licensing](https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/architecture/index.html) for the role of each layer.
+IDE and custom SDK applications use Device Core directly. AI clients and independent agents use the plugin Skill, invoke its bundled Device CLI for local device operations, and query the official online Knowledge MCP over HTTPS. Device CLI uses Device Core; EV-MUX connects the SDK to device firmware. See [License inventory](https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/license/index.html) for the role of each layer.
+
+For AI clients, the [local plugin](host/esp-vision-plugin/README.md) bundles a versioned [Device CLI](host/device-cli/README.md) and connects to the official online Knowledge MCP. Follow the [AI development guide](docs/en/how-to/esp-vision-plugin.rst) to connect your assistant, discover a board, prepare firmware and models, and develop Python applications through natural-language prompts. WorkBuddy and QoderWork users can search for `esp-vision` in their application marketplaces; the guide lists the matching entries.
+
+The [license inventory](docs/en/license/index.rst) records upstream components and adaptations, including the MIT-licensed MicroPython execution and thread overlays used for EV-MUX session isolation.
+
+## Host packages
+
+Each npm package has its own version, independent of firmware release tags. The badges above follow the public npm `latest` versions.
+
+| npm package | Responsibility | Documentation |
+| --- | --- | --- |
+| [@esp-vision/device-core](https://www.npmjs.com/package/@esp-vision/device-core) | Host SDK for sessions, Python, files, capture and firmware operations | [Device Core](host/device-core/README.md) |
+| [@esp-vision/device-cli](https://www.npmjs.com/package/@esp-vision/device-cli) | Standalone `esp-vision-device` command built on Device Core | [Device CLI](host/device-cli/README.md) |
+| [@esp-vision/knowledge-mcp](https://www.npmjs.com/package/@esp-vision/knowledge-mcp) | Knowledge server and versioned snapshot, with stdio and HTTP transports | [Knowledge MCP](host/knowledge-mcp/README.md) |
+| [@esp-vision/plugin](https://www.npmjs.com/package/@esp-vision/plugin) | Skill, bundled Device CLI and official online Knowledge MCP configuration for Codex, Claude Code and WorkBuddy | [Plugin installation](host/esp-vision-plugin/README.md) |
+
+Source builds also provide standalone WorkBuddy Expert, QoderWork and [Cursor Plugin exports](host/esp-vision-plugin/cursor/MAINTAINER.md), reusing the bundled CLI and Skill. Cursor local testing uses `~/.cursor/plugins/local/`; each host still requires installation and activation verification.
+
+The official plugin uses `https://mcp.vision.espressif.com/mcp`; knowledge is maintained centrally. The Knowledge npm package also supports self-hosting.
 
 ## Quickstart
 
-Prerequisites: ESP-IDF release/v5.5, release/v6.0, or release/v6.1 with the export script sourced (`idf.py` on `PATH`), and a [supported board](https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/target-support/index.html).
+Prerequisites: ESP-IDF v5.5.6 for ESP32-P4/S3, or release/v6.1 for ESP32-S31 with the export script sourced (`idf.py` on `PATH`), and a [supported board](https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/target-support/index.html).
 
 ```bash
 git clone --recursive https://github.com/espressif/esp-vision.git esp-vision
@@ -49,11 +86,20 @@ idf.py --board ESP32_P4X_EYE -p /dev/ttyACM0 build flash monitor
 
 ## ESP-IDF Compatibility
 
-| ESP-IDF branch | Support | Standard MicroPython features | Notes |
-| --- | --- | --- | --- |
-| `release/v5.5` | Supported | Provides the more complete feature set, including SSL/TLS, `cryptolib`, WebSocket, WebREPL, socket events, and, on supported chips, `machine.I2S`, ESP32 PCNT, and I2C target mode. | Recommended when these optional MicroPython features are required. |
-| `release/v6.0` | Supported | Provides `network`, WLAN, and sockets; the optional features listed for `release/v5.5` remain disabled with the current ESP-VISION overlay. | Does not currently support ESP32-S31 builds. |
-| `release/v6.1` | Supported | Provides `network`, WLAN, and sockets; the optional features listed for `release/v5.5` remain disabled with the current ESP-VISION overlay. | Supports ESP32-S31 builds. |
+CI builds and published firmware use the following board/IDF combinations:
+
+| Boards | ESP-IDF dependency | CI image |
+| --- | --- | --- |
+| ESP32-P4 and ESP32-S3 boards (including `TEMPLATE`) | **v5.5.6** | `espressif/idf:v5.5.6` |
+| ESP32-S31 boards (`ESP32_S31_CHATBOT`, `ESP32_S31_KORVO`, `ESP32_S31_MOSAICO`) | **release/v6.1** | `espressif/idf:release-v6.1` |
+
+Use the matching ESP-IDF checkout and source its `export.sh` before invoking `idf.py`. v5.5.6 is pinned to a patch release; `release/v6.1` follows the maintained 6.1 branch required by S31. Other ESP-IDF versions, including newer patches, release/v6.0 and master, are outside this CI qualification matrix. ESP-IDF or managed-component API changes can cause configuration/build failures, change runtime behavior or alter the Python APIs exposed by MicroPython. Such builds may need source, overlay or dependency adjustments and require their own hardware verification.
+
+With the current overlay, v5.5.6 enables SSL/TLS, `cryptolib`, WebSocket and socket events and, where the chip supports them, `machine.I2S`, PCNT and I2C target mode. These optional features remain disabled on the 6.1 build; inspect the actual firmware before relying on them. Traditional MicroPython WebREPL is not supported by the ESP-VISION EV-MUX runtime on either build: its terminal and file protocol do not participate in the single-owner session, lease or VM-epoch checks. Use Device Core over TCP for network control. The WebSocket or `_webrepl` compile flags alone do not imply a usable WebREPL service.
+
+## WT9932S31-TINY
+
+Build with `idf.py --board WT9932S31_TINY build` under ESP-IDF `release/v6.1`. See the [board guide](boards/WT9932S31_TINY/port/board.md) for the GC2145 camera, SD storage, USB ports, and device checks.
 
 ## Demos
 
@@ -67,18 +113,31 @@ idf.py --board ESP32_P4X_EYE -p /dev/ttyACM0 build flash monitor
 | ![Color detection demo](https://dl.espressif.com/AE/esp-vision/color-recognition.gif) | ![QR code demo](https://dl.espressif.com/AE/esp-vision/qr-code-recognition.gif) |
 |||
 
+## Report a problem
+
+Report functional ESP-VISION problems in [espressif/esp-vision GitHub Issues](https://github.com/espressif/esp-vision/issues), including problems in the IDE, website, Host Device Core, and firmware. For suspected security issues, follow the private reporting instructions in [SECURITY.md](SECURITY.md). Search existing issues first, then choose one of the four forms below. All four forms use English.
+
+| Category | Scope | Report form |
+| --- | --- | --- |
+| IDE | Editor, projects, UI, preview, and flashing workflows | [Report an IDE problem](https://github.com/espressif/esp-vision/issues/new?template=ide.yml) |
+| Website | Website pages, documentation, downloads, links, and MCP knowledge | [Report a website problem](https://github.com/espressif/esp-vision/issues/new?template=website.yml) |
+| Host Device Core | Host connections, EV-MUX sessions, RPC, transport, and reconnect | [Report a Host Device Core problem](https://github.com/espressif/esp-vision/issues/new?template=host-device-core.yml) |
+| Firmware | Builds, boot, crashes, camera, display, storage, and on-device APIs | [Report a firmware problem](https://github.com/espressif/esp-vision/issues/new?template=firmware.yml) |
+
+Each form asks for environment and version details, reproduction steps, expected and actual behavior, and relevant logs or attachments. If the category is unclear, choose the closest match and describe the affected workflow. The form sources are in [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/).
+
+## Security and Intended Use
+
+ESP-VISION is intended for development, evaluation, prototyping, and personal DIY projects. Its firmware, board configurations, and examples are development references, not a production SDK or a ready-to-deploy configuration for mass-produced products. ESP-VISION is not currently included in the Espressif Bug Bounty Program.
+
+The EV-MUX TCP interface provides wireless debugging on trusted local networks and has no peer authentication or transport encryption. Reachable clients can acquire an available session and control the device, including uploading files and running scripts. Use an isolated, trusted development network, or disable the TCP transport when it is unnecessary. See [SECURITY.md](SECURITY.md) for the trust model, configuration guidance, bounty scope, and private reporting channel.
+
 ## Resources
+
+- [Device Core SDK and API reference](https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/device-core/index.html)
 
 - [Supported Chips and Boards](https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/target-support/index.html)
 - [Web IDE](https://ide.vision.espressif.com/)
 - [Examples](example/)
 - [Customize firmware features](https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/how-to/customize-firmware.html)
-- [Solution architecture and licensing](https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/architecture/index.html)
-
-## WT9932S31-TINY
-
-Use `idf.py --board WT9932S31_TINY build` with ESP-IDF release/v6.1. See the [board guide](boards/WT9932S31_TINY/port/board.md) for the GC2145 camera, SD storage, USB connections, and memory constraints.
-
-| Board-specific source | Purpose | License |
-| --- | --- | --- |
-| Wireless-Tag GC2145 UXGA helper | Derive the validated UYVY sensor configuration | Apache-2.0; original notices retained |
+- [License inventory](https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/license/index.html)

@@ -14,6 +14,7 @@ set(MICROPY_MANIFEST_ESP_VISION_ROOT "${ESP_VISION_ROOT}")
 
 
 set(ESP_VISION_ENABLE_BARCODE OFF)
+set(ESP_VISION_ENABLE_CAMERA_IPA_CONTROL OFF)
 if(EXISTS "${ESP_VISION_BOARD_DIR}/board.cmake")
     include("${ESP_VISION_BOARD_DIR}/board.cmake")
 endif()
@@ -25,21 +26,26 @@ list(APPEND MICROPY_QSTRDEFS_PORT
 set(MICROPY_ESP32_MAIN_SOURCE "${ESP_VISION_ROOT}/platform/main.c")
 
 set(ESP_VISION_MODULE_SOURCES
+    ${ESP_VISION_ROOT}/modules/py_esp_vision_launcher.c
+    ${ESP_VISION_ROOT}/modules/py_uvc.c
     ${ESP_VISION_ROOT}/modules/py_display.c
+    ${ESP_VISION_ROOT}/modules/py_storage.c
     ${ESP_VISION_ROOT}/modules/py_image.c
     ${ESP_VISION_ROOT}/modules/py_imageio.c
     ${ESP_VISION_ROOT}/modules/py_helper.c
     ${ESP_VISION_ROOT}/modules/py_sensor.c
+    ${ESP_VISION_ROOT}/modules/py_lcd_touch.c
 )
 
 if((IDF_TARGET STREQUAL "esp32p4") OR (IDF_TARGET STREQUAL "esp32s3") OR (IDF_TARGET STREQUAL "esp32s31"))
     list(APPEND ESP_VISION_MODULE_SOURCES
         ${ESP_VISION_ROOT}/modules/py_espdl.cpp
+        ${ESP_VISION_ROOT}/platform/nanotrack.cpp
         ${ESP_VISION_ROOT}/modules/py_tflite.cpp
     )
 endif()
 
-if(IDF_TARGET STREQUAL "esp32s3")
+if((IDF_TARGET STREQUAL "esp32s3") OR (IDF_TARGET STREQUAL "esp32p4") OR (IDF_TARGET STREQUAL "esp32s31"))
     list(APPEND ESP_VISION_MODULE_SOURCES
         ${ESP_VISION_ROOT}/platform/usb_auto_download.c
     )
@@ -136,6 +142,26 @@ if(ESP_VISION_USE_BOARD_MANAGER)
         string(REPLACE "const static " "static const " generated_content "${generated_content}")
         file(WRITE "${generated_source}" "${generated_content}")
     endforeach()
+    # Board Manager 0.6.1 only emits psram_dma_direct for IDF >=6.1, missing
+    # the 5.5.5/6.0.2 backports. Patch our generated C, never the dependency.
+    execute_process(
+        COMMAND
+            "${ESP_VISION_PYTHON}"
+            "${ESP_VISION_ROOT}/tools/board_manager_compat.py"
+            --generated "${ESP_VISION_BOARD_MANAGER_GEN_DIR}/gen_board_device_config.c"
+            --board-dir "${ESP_VISION_BOARD_MANAGER_BOARD_DIR}"
+            --board-dir "${ESP_VISION_BOARD_MANAGER_INPUT_DIR}"
+            --idf-path "$ENV{IDF_PATH}"
+        RESULT_VARIABLE ESP_VISION_BOARD_MANAGER_COMPAT_RESULT
+        OUTPUT_VARIABLE ESP_VISION_BOARD_MANAGER_COMPAT_OUTPUT
+        ERROR_VARIABLE ESP_VISION_BOARD_MANAGER_COMPAT_ERROR
+    )
+    if(NOT ESP_VISION_BOARD_MANAGER_COMPAT_RESULT EQUAL 0)
+        message(FATAL_ERROR
+            "ESP Board Manager generated compatibility failed:\n"
+            "${ESP_VISION_BOARD_MANAGER_COMPAT_OUTPUT}\n"
+            "${ESP_VISION_BOARD_MANAGER_COMPAT_ERROR}")
+    endif()
     if(ESP_VISION_BOARD_MANAGER_ESP_BOARDS_SETUP)
         list(APPEND ESP_VISION_BOARD_MANAGER_SOURCES
             "${ESP_VISION_BOARDS_DIR}/${ESP_VISION_BOARD_MANAGER_ESP_BOARDS_SETUP}"
@@ -168,18 +194,36 @@ add_library(usermod_esp_vision_platform INTERFACE)
 target_sources(usermod_esp_vision_platform INTERFACE
     ${ESP_VISION_MODULE_SOURCES}
     ${ESP_VISION_CAMERA_SOURCE}
+    ${ESP_VISION_ROOT}/platform/camera_framebuffer.c
+    ${ESP_VISION_ROOT}/platform/camera_lifecycle.c
     ${ESP_VISION_BOARD_MANAGER_SOURCES}
     ${ESP_VISION_ROOT}/platform/debug.c
     ${ESP_VISION_ROOT}/platform/display.c
     ${ESP_VISION_ROOT}/platform/ev_channel.c
     ${ESP_VISION_ROOT}/platform/ev_control_transport.c
+    ${ESP_VISION_ROOT}/platform/ev_file_transfer.c
+    ${ESP_VISION_ROOT}/platform/ev_launcher_state.c
+    ${ESP_VISION_ROOT}/platform/ev_memory.c
     ${ESP_VISION_ROOT}/platform/ev_mux.c
+    ${ESP_VISION_ROOT}/platform/ev_session.c
     ${ESP_VISION_ROOT}/platform/ev_stdio.c
+    ${ESP_VISION_ROOT}/platform/ev_tcp.c
+    ${ESP_VISION_ROOT}/platform/ev_transport.c
+    ${ESP_VISION_ROOT}/platform/ev_vm_output.c
     ${ESP_VISION_ROOT}/platform/jpeg.c
+    ${ESP_VISION_ROOT}/platform/jpeg_validate.c
+    ${ESP_VISION_ROOT}/platform/device_identity.c
+    ${ESP_VISION_ROOT}/platform/network_discovery.c
+    ${ESP_VISION_ROOT}/platform/network_service.c
     ${ESP_VISION_ROOT}/platform/preview.c
     ${ESP_VISION_ROOT}/platform/sdcard.c
     ${ESP_VISION_ROOT}/platform/storage.c
+    ${ESP_VISION_ROOT}/platform/storage_provision.c
+    ${ESP_VISION_ROOT}/platform/storage_label.c
     ${ESP_VISION_ROOT}/platform/storage_vfs.c
+    ${ESP_VISION_ROOT}/platform/lcd_touch.c
+    ${ESP_VISION_ROOT}/platform/storage_writer_msc.c
+    ${ESP_VISION_ROOT}/platform/uvc.c
     ${ESP_VISION_ROOT}/platform/usb_msc.c
     ${ESP_VISION_BOARD_SOURCES}
 )
@@ -235,6 +279,34 @@ if(ESP_VISION_ENABLE_BARCODE
     )
 
     list(APPEND IDF_COMPONENTS zxing)
+endif()
+
+# Runtime IPA and manual ISP control is opt-in per board (board sets
+# ESP_VISION_ENABLE_CAMERA_IPA_CONTROL in its boards/<board>/board.cmake) and
+# only works where the camera feeds the ESP32-P4 ISP over MIPI-CSI. The ISP
+# pipeline controller lives in esp_video's private_include, so this depends on
+# upstream internals and needs revisiting whenever esp_video is upgraded.
+if(ESP_VISION_BOARD STREQUAL "ESP32_P4X_EYE" OR ESP_VISION_ENABLE_CAMERA_IPA_CONTROL)
+    idf_component_get_property(ESP_VISION_VIDEO_DIR espressif__esp_video COMPONENT_DIR)
+    target_include_directories(usermod_esp_vision_platform INTERFACE
+        ${ESP_VISION_VIDEO_DIR}/private_include
+    )
+endif()
+if(ESP_VISION_ENABLE_CAMERA_IPA_CONTROL)
+    target_compile_definitions(usermod_esp_vision_platform INTERFACE ESP_VISION_ENABLE_CAMERA_IPA_CONTROL=1)
+    list(APPEND MICROPY_CPP_DEF_EXTRA ESP_VISION_ENABLE_CAMERA_IPA_CONTROL=1)
+    target_sources(usermod_esp_vision_platform INTERFACE
+        ${ESP_VISION_ROOT}/modules/py_sensor_isp.c
+        ${ESP_VISION_ROOT}/platform/camera_isp.c
+        ${ESP_VISION_ROOT}/platform/video_isp.c
+        ${ESP_VISION_ROOT}/platform/video_isp_stats.c
+    )
+    list(APPEND IDF_COMPONENTS espressif__esp_video)
+    if(CONFIG_ESP_VIDEO_ENABLE_ISP_PIPELINE_CONTROLLER)
+        idf_component_get_property(ESP_VISION_IPA_DIR espressif__esp_ipa COMPONENT_DIR)
+        target_include_directories(usermod_esp_vision_platform INTERFACE ${ESP_VISION_IPA_DIR}/include)
+        list(APPEND IDF_COMPONENTS espressif__esp_ipa)
+    endif()
 endif()
 
 target_compile_options(usermod_esp_vision_platform INTERFACE

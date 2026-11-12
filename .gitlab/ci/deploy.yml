@@ -1,14 +1,28 @@
 # SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
 
+release_source_order_checks:
+  stage: check
+  image: $CI_PYTHON_IMAGE
+  tags: [build]
+  before_script:
+    - python -m pip install PyYAML
+  script:
+    - python -m unittest discover -s .gitlab/tests -p 'test_*.py'
+
 push_to_github:
-  stage: post_deploy
+  stage: deploy
   rules:
     # Manual force push from a web-triggered pipeline (CI/CD -> Run pipeline,
     # set force_push_to_github to true), regardless of branch.
     - if: '$CI_PIPELINE_SOURCE == "web" && $CI_FORCE_PUSH_TO_GITHUB == "true"'
       when: manual
-    # Automatic sync for tags and for master / release branches.
+    # Release sources must exist before the DL publisher validates model URLs.
+    - if: "$CI_COMMIT_TAG =~ /^(v\\d+\\.\\d+(\\.\\d+)?|\\d{4}\\.\\d{1,2}\\.\\d{1,2})($|[-.])/"
+      needs:
+        - job: qualify_firmware_release
+          artifacts: false
+    # Other tags and master/release branches retain their normal source mirror.
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH =~ /^release\/v/'
   image: $CI_DOCKER_REGISTRY/esp32-ci-env
@@ -93,7 +107,7 @@ deploy_docs_production:
 post_docs_preview:
   stage: post_deploy
   extends: .rules:docs:preview
-  image: python:3.11-slim
+  image: $CI_PYTHON_IMAGE
   tags:
     - deploy_docs
   needs:
@@ -116,27 +130,27 @@ post_docs_preview:
 pack_launchpad:
   stage: deploy
   extends: .rules:release
-  image: espressif/idf:release-v5.5
+  image: espressif/idf:v5.5.6
   tags:
     - build
   variables:
-    # Fetch full history + all tags: generate_launchpad lists every published
-    # release tag in config.toml's [website].releases. A shallow clone would
-    # truncate that to only the tag being built.
-    GIT_DEPTH: "0"
+    # Full source identity, not git-tag enumeration, binds the publication.
+    GIT_DEPTH: "1"
+    ESP_VISION_PUBLICATION_LAYOUT: "legacy"
+    ESP_VISION_ALLOW_MISSING_MCP: "1"
   # Reuse the already-built release firmware artifacts; do not rebuild. P4/S3
-  # use release/v5.5 and S31 uses release/v6.1. Keep this list in sync with
+  # use v5.5.6 and S31 uses release/v6.1. Keep this list in sync with
   # tools/ci/launchpad/boards.yml.
   needs:
-    - job: "firmware: [release-v5.5, ESP32_P4X_EYE]"
+    - job: "firmware: [v5.5.6, ESP32_P4X_EYE]"
       artifacts: true
-    - job: "firmware: [release-v5.5, ESP32_P4X_FUNCTION_EV_BOARD]"
+    - job: "firmware: [v5.5.6, ESP32_P4X_FUNCTION_EV_BOARD]"
       artifacts: true
-    - job: "firmware: [release-v5.5, ESP32_P4X_VISION]"
+    - job: "firmware: [v5.5.6, ESP32_P4X_VISION]"
       artifacts: true
-    - job: "firmware: [release-v5.5, ESP32_S3_EYE]"
+    - job: "firmware: [v5.5.6, ESP32_S3_EYE]"
       artifacts: true
-    - job: "firmware: [release-v5.5, AtomS3R-M12]"
+    - job: "firmware: [v5.5.6, AtomS3R-M12]"
       artifacts: true
     - job: "firmware: [release-v6.1, ESP32_S31_CHATBOT]"
       artifacts: true
@@ -145,35 +159,60 @@ pack_launchpad:
     - job: "firmware: [release-v6.1, ESP32_S31_MOSAICO]"
       artifacts: true
   before_script:
-    # Pin esptool >= 5.3: release-v5.5's bundled version predates the esp32s31
+    # Pin esptool >= 5.3: v5.5.6's bundled version predates the esp32s31
     # target (ESP32_S31_KORVO, IDF_TARGET esp32s31). esptool 5.3 adds esp32s31
     # support and still merges the esp32p4 / esp32s3 images built by this same
     # IDF release.
     - python -m pip install --upgrade "esptool>=5.3" rtoml pyyaml
   script:
-    - python tools/ci/launchpad/generate_launchpad.py "$CI_COMMIT_TAG"
-    # Publish the MCP API pack alongside config.toml by dropping it into the same
-    # binaries/ tree the AE ae_upload_dl job copies to dl.espressif.com. Lands at
-    # dl.espressif.com/AE/esp-vision/mcp/{latest.json,mcp-pack-<tag>.json}.
-    # Best-effort (|| true): the real gates are mcp_pack_check + build_mcp_pack;
-    # never block a firmware release on pack publishing.
-    - git submodule update --init --depth 1 lib/micropython || true
-    - python -m pip install --upgrade jsonschema || true
-    - mkdir -p binaries/mcp
+    # Knowledge is published separately through the main GitLab package/image registry.
     - |
-      mcp_pack="binaries/mcp/mcp-pack-$CI_COMMIT_TAG.json"
-      if python docs/gen_mcp.py "$CI_COMMIT_TAG" --out "$mcp_pack" \
-         && python tools/ci/mcp/validate_schema.py "$mcp_pack"; then
-        cp "$mcp_pack" binaries/mcp/latest.json
-      else
-        echo "WARNING: MCP pack generation/validation failed; skipping MCP publish"
-        rm -f "$mcp_pack" binaries/mcp/latest.json
-      fi
+      optional_mcp=""
+      if [ "$ESP_VISION_ALLOW_MISSING_MCP" = "1" ]; then optional_mcp="--allow-missing-mcp"; fi
+      python tools/ci/launchpad/generate_launchpad.py "$CI_COMMIT_TAG" \
+        --layout "$ESP_VISION_PUBLICATION_LAYOUT" $optional_mcp
+    - python tools/ci/launchpad/validate_release.py "$CI_COMMIT_TAG" --require-publication --source-commit "$CI_COMMIT_SHA" --pipeline-id "$CI_PIPELINE_ID"
   artifacts:
     when: on_success
     expire_in: 1 month
     paths:
       - binaries/
+
+# Packaging may overlap hardware checks, but qualification and upload may not.
+qualify_firmware_release:
+  stage: deploy
+  extends: .rules:release
+  image: python:3.12-bookworm
+  tags: [build]
+  needs:
+    - job: pack_launchpad
+      artifacts: true
+    - job: firmware
+      artifacts: false
+    - job: target_test_p4x_function_ev_board_idf5.5.6
+      artifacts: false
+    - job: target_test_p4x_vision_idf5.5.6
+      artifacts: false
+    - job: target_test_s31_korvo_idf6.1
+      artifacts: false
+    - job: device_core_checks
+      artifacts: false
+    - job: pre_commit
+      artifacts: false
+    - job: release_source_order_checks
+      artifacts: false
+    - job: python_stubs
+      artifacts: false
+    - job: evmux_host_checks
+      artifacts: false
+    - job: launchpad_config_check
+      artifacts: false
+    - job: mcp_pack_check
+      artifacts: false
+  before_script:
+    - python -m pip install rtoml
+  script:
+    - python tools/ci/launchpad/validate_release.py "$CI_COMMIT_TAG" --require-publication --source-commit "$CI_COMMIT_SHA" --pipeline-id "$CI_PIPELINE_ID"
 
 # trigger.yml defines the upload-dl-trigger job (image / script / tags) that
 # triggers the AE ae_upload_dl pipeline. The override below only adds the
@@ -181,12 +220,18 @@ pack_launchpad:
 # and the launchpad environment link.
 include:
   - project: 'ae_group/test-related/ae_upload_dl'
+    ref: 'a91d13eb39b56f2a2f2ca5005f9a92655026e6a0'
     file: 'trigger.yml'
 
 upload-dl-trigger:
   extends: .rules:release
+  stage: deploy
   needs:
+    - job: push_to_github
+      artifacts: false
     - job: pack_launchpad
+      artifacts: false
+    - job: qualify_firmware_release
       artifacts: false
   # environment.url is only the clickable link shown in GitLab's Environments
   # UI; it does not affect the upload or config.toml. Point it at the published
@@ -197,6 +242,9 @@ upload-dl-trigger:
     name: esp-vision_release
     url: https://dl.espressif.com/AE/esp-vision/
   variables:
+    # Pin helper code independently of the protected production pipeline ref.
+    UPLOAD_DL_HELPER_REF: 'a91d13eb39b56f2a2f2ca5005f9a92655026e6a0'
+    TRIGGER_REPO_REF: main
     # Project access token (api + read_api) so ae_upload_dl can download the
     # pack_launchpad artifacts from this pipeline. Define UPLOAD_ACCESS_TOKEN as
     # a masked/protected CI/CD variable in the esp-vision project settings.

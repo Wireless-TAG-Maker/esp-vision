@@ -30,6 +30,7 @@
 // This file is never compiled standalone, it's included directly from
 // extmod/modmachine.c via MICROPY_PY_MACHINE_INCLUDEFILE.
 
+#include "py/mperrno.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_mac.h"
@@ -265,31 +266,21 @@ static mp_int_t mp_machine_reset_cause(void) {
 }
 
 #if MICROPY_ESP32_USE_BOOTLOADER_RTC
-#if !CONFIG_IDF_TARGET_ESP32P4
-#include "soc/rtc_cntl_reg.h"
-#include "usb.h"
+#if CONFIG_IDF_TARGET_ESP32P4 || CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32S31
+#include "usb_auto_download.h"
 #else
-#include "soc/lp_system_reg.h"
-#endif
-#if CONFIG_IDF_TARGET_ESP32S3
-#include "esp32s3/rom/usb/usb_dc.h"
-#include "esp32s3/rom/usb/usb_persist.h"
-#include "esp32s3/rom/usb/chip_usb_dw_wrapper.h"
+#include "soc/rtc_cntl_reg.h"
 #endif
 
 MP_NORETURN static void machine_bootloader_rtc(void) {
-    #if CONFIG_IDF_TARGET_ESP32S3 && MICROPY_HW_USB_CDC
-    usb_usj_mode();
-    usb_dc_prepare_persist();
-    chip_usb_set_persist_flags(USBDC_BOOT_DFU);
-    #endif
-    #if !CONFIG_IDF_TARGET_ESP32P4
+    #if CONFIG_IDF_TARGET_ESP32P4 || CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32S31
+    esp_vision_restart(true);
+    #else
     REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
     esp_restart();
-    #else
-    REG_WRITE(LP_SYSTEM_REG_SYS_CTRL_REG, LP_SYSTEM_REG_FORCE_DOWNLOAD_BOOT);
-    esp_restart();
     #endif
+    for (;;) {
+    }
 }
 #endif
 
@@ -321,7 +312,10 @@ MP_NORETURN static void mp_machine_reset(void) {
 
 static mp_obj_t mp_machine_unique_id(void) {
     uint8_t chipid[6];
-    esp_efuse_mac_get_default(chipid);
+    // The default API returns an 8-byte EUI-64 on IEEE 802.15.4 chips.
+    if (esp_read_mac(chipid, ESP_MAC_EFUSE_FACTORY) != ESP_OK) {
+        mp_raise_OSError(MP_EIO);
+    }
     return mp_obj_new_bytes(chipid, 6);
 }
 

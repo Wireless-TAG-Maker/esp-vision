@@ -1,8 +1,14 @@
 <p align="center">
-  <img src="docs/_static/ESP-VISION_logo.svg" alt="ESP-VISION logo" width="100%" height="240">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/_static/ESP-VISION_logo_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/_static/ESP-VISION_logo.svg">
+    <img src="docs/_static/ESP-VISION_logo_adaptive.svg" alt="ESP-VISION logo" width="960">
+  </picture>
 </p>
 
 # ESP-VISION
+
+[![Device Core npm version](https://img.shields.io/npm/v/%40esp-vision%2Fdevice-core?logo=npm&label=Device%20Core)](https://www.npmjs.com/package/@esp-vision/device-core) [![Device CLI npm version](https://img.shields.io/npm/v/%40esp-vision%2Fdevice-cli?logo=npm&label=Device%20CLI)](https://www.npmjs.com/package/@esp-vision/device-cli) [![Knowledge MCP npm version](https://img.shields.io/npm/v/%40esp-vision%2Fknowledge-mcp?logo=npm&label=Knowledge%20MCP)](https://www.npmjs.com/package/@esp-vision/knowledge-mcp) [![Plugin npm version](https://img.shields.io/npm/v/%40esp-vision%2Fplugin?logo=npm&label=Plugin)](https://www.npmjs.com/package/@esp-vision/plugin) [![License](https://img.shields.io/github/license/espressif/esp-vision?label=License)](LICENSE)
 
 **Low-Code Edge AI & Computer Vision Framework for Espressif SoCs**
 
@@ -16,22 +22,53 @@ ESP-VISION 是面向乐鑫 SoC 的低代码端侧 AI 与计算机视觉框架，
 - 提供绘图、滤波、颜色追踪、特征检测、二维码、条码和 AprilTag 等图像处理能力。
 - 基于 ESP-DL 提供目标检测、姿态估计和图像分类等 AI 推理能力，并简化端侧模型部署流程。
 - 底层高效的 C/C++ 基础组件深度协同芯片的多媒体外设与硬件加速模块，切实保障应用的高效与实时运行性能。
-- 可通过 VSCode 上位机工具或 [Web IDE](https://ide.vision.espressif.com/) 开发，并使用 `idf.py` 管理固件构建。
+- 可通过 VSCode 上位机工具、[Web IDE](https://ide.vision.espressif.com/)、独立 [Device CLI](host/device-cli/README.md)，或通过官方[插件](host/esp-vision-plugin/README.md)接入受支持的 AI 客户端，并使用 `idf.py` 管理固件构建。
 
 **文档中心**：
 
 - [中文](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/)
 - [English](https://docs.espressif.com/projects/esp-vision/en/latest/)
 
+## EV-MUX：主机通信
+
+EV-MUX v4 为 IDE、主机工具及独立 Agent 适配器提供发现、控制、带帧格式的 Python 交互和 JPEG 预览。开发板启用的 `usj`、`usb`、`uart`、`tcp` 链路共用唯一 owner 会话，由该会话同时拥有 user/debug 两条 stream。
+
+[通信系统与 EV-MUX](docs/zh_CN/communication/index.rst) 是详细说明入口，涵盖 [console/日志架构](docs/zh_CN/communication/architecture.rst)、[接口与板级配置](docs/zh_CN/communication/interfaces.rst)、[所有权与恢复](docs/zh_CN/communication/sessions.rst)、[线上协议](docs/zh_CN/communication/wire-protocol.rst)、文件、预览、Wi-Fi 配置及验收。
+
+v4 继续使用 `EVMUX/1` 帧格式。主机必须显式接管并保活，不支持 `route.bind`/`route.auto`。可用接口以运行时 `capabilities` 为准；当前 TCP 实现不提供认证或加密。
+
 ## 方案架构
 
-![ESP-VISION 分层架构](docs/_static/esp-vision-architecture.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/_static/esp-vision-architecture.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/_static/esp-vision-architecture-light.svg">
+  <img src="docs/_static/esp-vision-architecture-adaptive.svg" alt="ESP-VISION 分层架构" width="960" height="1048">
+</picture>
 
-各层的职责说明见 [方案架构与许可证](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/esp32p4/architecture/index.html)。
+IDE 和自定义 SDK 应用直接使用 Device Core。AI 客户端与独立 Agent 使用插件的 Skill，通过内置 Device CLI 在本地操作设备，并通过 HTTPS 查询官方在线 Knowledge MCP。Device CLI 调用 Device Core，SDK 再通过 EV-MUX 与设备固件通信。各层职责见 [许可证清单](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/esp32p4/license/index.html)。
+
+[许可证清单](docs/zh_CN/license/index.rst)记录了上游组件与适配文件，包括用于 EV-MUX 会话隔离、保留 MIT 许可证的 MicroPython 执行与线程 overlay。
+
+面向 AI 客户端，[本地插件](host/esp-vision-plugin/README.md)内置固定版本的 [Device CLI](host/device-cli/README.md)，并连接官方在线 Knowledge MCP。通过 [AI 开发指南](docs/zh_CN/how-to/esp-vision-plugin.rst)接入助手，用自然语言完成设备发现、固件与模型准备以及 Python 应用开发。WorkBuddy 和 QoderWork 用户可在应用市场搜索 `esp-vision`，指南中列出了对应条目。
+
+## 主机工具包
+
+各 npm 包独立维护版本，与固件发布标签无关。顶部徽章动态显示 npm 上公开的 `latest` 版本。
+
+| npm 包 | 职责 | 文档 |
+| --- | --- | --- |
+| [@esp-vision/device-core](https://www.npmjs.com/package/@esp-vision/device-core) | 主机 SDK，负责会话、Python、文件、抓图及固件操作 | [Device Core](host/device-core/README.md) |
+| [@esp-vision/device-cli](https://www.npmjs.com/package/@esp-vision/device-cli) | 基于 Device Core 的独立 `esp-vision-device` 命令 | [Device CLI](host/device-cli/README.md) |
+| [@esp-vision/knowledge-mcp](https://www.npmjs.com/package/@esp-vision/knowledge-mcp) | 知识服务与版本化快照，支持 stdio 和 HTTP 传输 | [Knowledge MCP](host/knowledge-mcp/README.md) |
+| [@esp-vision/plugin](https://www.npmjs.com/package/@esp-vision/plugin) | 为 Codex、Claude Code、WorkBuddy 提供 Skill、内置 Device CLI 和官方在线 Knowledge MCP 配置 | [插件安装](host/esp-vision-plugin/README.md) |
+
+源码构建还提供独立的 WorkBuddy Expert、QoderWork 和 [Cursor Plugin 导出包](host/esp-vision-plugin/cursor/MAINTAINER.md)，复用随包 CLI 与 Skill。Cursor 本地测试使用 `~/.cursor/plugins/local/`；各宿主仍需分别验证安装和激活。
+
+官方插件连接 `https://mcp.vision.espressif.com/mcp`，统一维护在线知识。Knowledge npm 包也支持自行部署。
 
 ## 快速开始
 
-环境要求：ESP-IDF release/v5.5、release/v6.0 或 release/v6.1（已 source `export.sh`，`idf.py` 可用），以及一块 [受支持的开发板](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/esp32p4/target-support/index.html)。
+环境要求：ESP32-P4/S3 使用 ESP-IDF v5.5.6，ESP32-S31 使用 release/v6.1（已 source `export.sh`，`idf.py` 可用），以及一块 [受支持的开发板](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/esp32p4/target-support/index.html)。
 
 ```bash
 git clone --recursive https://github.com/espressif/esp-vision.git esp-vision
@@ -49,11 +86,20 @@ idf.py --board ESP32_P4X_EYE -p /dev/ttyACM0 build flash monitor
 
 ## ESP-IDF 兼容性
 
-| ESP-IDF 分支 | 支持状态 | 标准 MicroPython 功能 | 说明 |
-| --- | --- | --- | --- |
-| `release/v5.5` | 支持 | 提供更完整的功能集，包括 SSL/TLS、`cryptolib`、WebSocket、WebREPL、socket events，以及受支持芯片上的 `machine.I2S`、ESP32 PCNT 和 I2C target 模式。 | 需要上述可选 MicroPython 功能时推荐使用。 |
-| `release/v6.0` | 支持 | 提供 `network`、WLAN 和 socket；使用当前 ESP-VISION overlay 时，`release/v5.5` 中列出的可选功能仍保持关闭。 | 当前不支持构建 ESP32-S31。 |
-| `release/v6.1` | 支持 | 提供 `network`、WLAN 和 socket；使用当前 ESP-VISION overlay 时，`release/v5.5` 中列出的可选功能仍保持关闭。 | 支持构建 ESP32-S31。 |
+CI 构建和发布固件使用以下开发板与 IDF 组合：
+
+| 开发板 | ESP-IDF 依赖 | CI 镜像 |
+| --- | --- | --- |
+| ESP32-P4 和 ESP32-S3 开发板（包括 `TEMPLATE`） | **v5.5.6** | `espressif/idf:v5.5.6` |
+| ESP32-S31 开发板（`ESP32_S31_CHATBOT`、`ESP32_S31_KORVO`、`ESP32_S31_MOSAICO`） | **release/v6.1** | `espressif/idf:release-v6.1` |
+
+运行 `idf.py` 前，请使用对应的 ESP-IDF checkout 并 source 其 `export.sh`。v5.5.6 固定到补丁版本；`release/v6.1` 跟随 S31 所需的 6.1 维护分支。其它 IDF 版本（包括更新的补丁版本、release/v6.0 和 master）不在此 CI 验证矩阵内。ESP-IDF 或托管组件的 API 变更可能导致配置/编译失败、运行行为变化，或改变 MicroPython 暴露的 Python API；使用这些版本时，可能需要适配源码、overlay 或依赖，并单独进行硬件验证。
+
+当前 overlay 在 v5.5.6 下启用 SSL/TLS、`cryptolib`、WebSocket、socket events，以及芯片支持时的 `machine.I2S`、PCNT 和 I2C target 模式。这些可选功能在 6.1 构建中仍保持关闭；使用前应检查实际固件。两个构建的 ESP-VISION EV-MUX 运行态均不支持传统 MicroPython WebREPL，其终端与文件协议未接入唯一 owner 会话、租约和 VM 代次校验。网络控制请使用 Device Core 的 TCP 连接；仅启用 WebSocket 或 `_webrepl` 编译选项不代表 WebREPL 服务可用。
+
+## WT9932S31-TINY
+
+使用 ESP-IDF `release/v6.1` 执行 `idf.py --board WT9932S31_TINY build`。GC2145 摄像头、SD 存储、USB 接口和实机检查见[板级说明](boards/WT9932S31_TINY/port/board.md)。
 
 ## 效果演示
 
@@ -67,18 +113,31 @@ idf.py --board ESP32_P4X_EYE -p /dev/ttyACM0 build flash monitor
 | ![Color detection demo](https://dl.espressif.com/AE/esp-vision/color-recognition.gif) | ![QR code demo](https://dl.espressif.com/AE/esp-vision/qr-code-recognition.gif) |
 |||
 
+## 问题反馈
+
+ESP-VISION 的功能问题统一提交到 [espressif/esp-vision GitHub Issues](https://github.com/espressif/esp-vision/issues)，包括 IDE、官网、Host Device Core 和固件问题。疑似安全问题请按照 [SECURITY.md](SECURITY.md) 中的说明私下报告。请先搜索已有问题，再选择下面四类表单之一，四类表单统一使用英文。
+
+| 分类 | 范围 | 报告入口 |
+| --- | --- | --- |
+| IDE | 编辑器、项目、界面、预览及烧录流程 | [报告 IDE 问题](https://github.com/espressif/esp-vision/issues/new?template=ide.yml) |
+| 官网 | 官网页面、文档、下载、链接及 MCP 知识 | [报告官网问题](https://github.com/espressif/esp-vision/issues/new?template=website.yml) |
+| Host Device Core | 主机连接、EV-MUX 会话、RPC、传输及重连 | [报告 Host Device Core 问题](https://github.com/espressif/esp-vision/issues/new?template=host-device-core.yml) |
+| 固件 | 编译、启动、崩溃、摄像头、显示、存储及设备端 API | [报告固件问题](https://github.com/espressif/esp-vision/issues/new?template=firmware.yml) |
+
+每类表单均包含环境与版本信息、复现步骤、预期行为、实际行为及相关日志或附件。不确定分类时，请选择最接近的一类，并描述出问题的操作流程。表单源文件位于 [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/)。
+
+## 安全与使用范围
+
+ESP-VISION 面向开发、评估、原型验证和个人 DIY 项目。仓库中的固件、开发板配置和示例用于开发参考，并非面向客户量产的 SDK 或可直接用于量产的配置。ESP-VISION 目前不在乐鑫漏洞赏金计划范围内。
+
+EV-MUX TCP 接口用于可信本地网络中的无线调试，不提供对端身份认证或传输加密。能够访问该接口的客户端可取得空闲会话并控制设备，包括上传文件和运行脚本。请使用隔离且参与者可信的开发网络，不需要无线调试时应禁用 TCP 传输。信任边界、配置建议、赏金范围及私下报告渠道详见 [SECURITY.md](SECURITY.md)。
+
 ## 资源
+
+- [Device Core SDK 与 API 参考](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/esp32p4/device-core/index.html)
 
 - [芯片与开发板支持](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/esp32p4/target-support/index.html)
 - [Web IDE](https://ide.vision.espressif.com/)
 - [示例](example/)
 - [客制化固件功能](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/esp32p4/how-to/customize-firmware.html)
-- [方案架构与许可证](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/esp32p4/architecture/index.html)
-
-## WT9932S31-TINY
-
-使用 ESP-IDF release/v6.1 执行 `idf.py --board WT9932S31_TINY build`。GC2145 摄像头、SD 存储、USB 接口和内存限制见[板级说明](boards/WT9932S31_TINY/port/board.md)。
-
-| 板级来源 | 用途 | 许可证 |
-| --- | --- | --- |
-| Wireless-Tag GC2145 UXGA 辅助代码 | 派生已经参考工程验证的 UYVY 传感器配置 | Apache-2.0；保留原始声明 |
+- [许可证清单](https://docs.espressif.com/projects/esp-vision/zh_CN/latest/esp32p4/license/index.html)

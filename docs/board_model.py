@@ -51,7 +51,10 @@ BOARD_IMAGES = {
     'ESP32_P4X_VISION': '../../_static/boards/ESP32_P4X_VISION/ESP32-P4X-VISION.png',
     'AtomS3R-M12': '../../_static/boards/AtomS3R-M12/AtomS3R-M12.png',
     'ESP32_S31_CHATBOT': '../../_static/ESP-VISION_logo.svg',
-    'ESP32_S31_MOSAICO': '../../_static/ESP-VISION_logo.svg',
+    'ESP32_S31_MOSAICO': (
+        'https://raw.githubusercontent.com/espressif/esp-dev-kits/master/'
+        'docs/_static/esp-mosaico/esp-mosaico-v1.2-isometric.png'
+    ),
 }
 
 # Canonical (English) getting-started URL override; falls back to board.json's
@@ -64,6 +67,10 @@ BOARD_URLS = {
     'ESP32_S31_KORVO': (
         'https://docs.espressif.com/projects/esp-dev-kits/en/latest/'
         'esp32s31/esp32-s31-korvo-1/index.html'
+    ),
+    'ESP32_S31_MOSAICO': (
+        'https://docs.espressif.com/projects/esp-vision/en/latest/'
+        'esp32s31/target-support/index.html'
     ),
     'ESP32_P4X_VISION': (
         'https://docs.espressif.com/projects/esp-vision/en/latest/esp32p4/index.html'
@@ -139,6 +146,11 @@ def board_info(board, target):
     port_macros.update(_defined_macros(MP_BOARD_ROOT / board / 'port' / 'mpconfigboard.h'))
     imlib_macros = _defined_macros(BOARD_ROOT / board / 'imlib_config.h')
     modules = TARGET_CAPABILITIES[target]['modules']
+    if any(re.search(r'#define\s+' + name + r'\s+\(?0\)?\s*(?://.*)?$',
+                     (MP_BOARD_ROOT / board / 'port' / 'mpconfigboard.h').read_text(),
+                     re.MULTILINE)
+           for name in ('MICROPY_HW_ENABLE_USBDEV', 'MICROPY_HW_USB_UVC')):
+        modules = tuple(module for module in modules if module != 'uvc')
     if board in TARGET_CAPABILITIES[target]['barcode_boards']:
         modules = modules + ('barcode',)
     image = BOARD_IMAGES[board]

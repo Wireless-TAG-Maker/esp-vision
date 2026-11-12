@@ -1,0 +1,200 @@
+// SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
+// SPDX-License-Identifier: Apache-2.0
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {
+  filterSerialPorts, inventory, listSerial, serialEntry, transportFor,
+} from '../src/node.js'
+
+test('the public Node entry point exposes passive inventory and serial adapters', () => {
+  assert.equal(typeof listSerial, 'function')
+  assert.equal(typeof filterSerialPorts, 'function')
+  assert.equal(typeof serialEntry, 'function')
+  assert.equal(typeof transportFor, 'function')
+  assert.equal(typeof inventory, 'function')
+})
+
+test('LAN discovery failures retain the original loading or socket diagnostic', async () => {
+  for (const failure of [
+    new Error('Dynamic require of "buffer" is not supported'),
+    Object.assign(new Error('bind EACCES 0.0.0.0:5353'), { code: 'EACCES' }),
+  ]) {
+    const result = await inventory({ interfaces: ['tcp'] }, {
+      async listNetwork() { throw failure },
+    })
+    assert.equal(result.sourcesAvailable, 0)
+    assert.deepEqual(result.devices, [])
+    assert.deepEqual(result.warnings, [{
+      source: 'tcp', code: failure.code ?? 'DISCOVERY_UNAVAILABLE',
+      message: `LAN discovery unavailable: ${failure.message}`,
+    }])
+  }
+})
+
+test('npm enumeration normalizes USB IDs without opening a device', async () => {
+  let opened = false
+  const ports = await listSerial({}, { platform: 'win32', binding: async () => ({
+    list: async () => [{ path: 'COM9', vendorId: '303a', productId: '1001', locationId: 'Port_#0003.Hub_#0001' }],
+    open: () => { opened = true },
+  }) })
+  assert.equal(ports[0].vendorId, 0x303a)
+  assert.equal(ports[0].productId, 0x1001)
+  assert.equal(ports[0].location, 'Port_#0003.Hub_#0001')
+  assert.equal(opened, false)
+})
+
+test('serial enumeration bounds stalled native calls and preserves cancellation', async () => {
+  const binding = async () => ({ list: () => new Promise(() => {}) })
+  await assert.rejects(listSerial({ timeout: 10 }, { binding }), { code: 'TIMEOUT' })
+  const controller = new AbortController(), reason = new Error('cancelled')
+  const pending = listSerial({ signal: controller.signal }, { binding })
+  controller.abort(reason)
+  await assert.rejects(pending, error => error === reason)
+})
+
+test('serial candidate filtering stays platform-aware and classification is descriptor-only', () => {
+  const ports = [
+    { path: '/dev/ttyACM0', vendorId: 0x303a, productId: 0x1001, product: 'USB JTAG/serial' },
+    { path: '/dev/ttyUSB0' },
+    { path: '/dev/ttyS0' },
+  ]
+  assert.deepEqual(filterSerialPorts(ports, { platform: 'linux' }), ports.slice(0, 2))
+  assert.deepEqual(filterSerialPorts(ports, { platform: 'linux', allPorts: true }), ports)
+  const entry = serialEntry(ports[0])
+  assert.equal(entry.interface, 'usj')
+  assert.equal(entry.status, 'unprobed')
+  assert.equal(entry.identity, null)
+  const transport = transportFor(entry, { python: 'python-test' })
+  assert.equal(typeof transport.connect, 'function')
+})
+
+test('inventory forwards timeout and cancellation without probing by default', async () => {
+  const controller = new AbortController()
+  let serialRequest
+  let opened = 0
+  const result = await inventory({ interfaces: ['serial'], timeout: 750, signal: controller.signal }, {
+    platform: 'linux',
+    async listSerial(request) {
+      serialRequest = request
+      return [{ path: '/dev/ttyACM1', vendorId: 0x303a, productId: 0x1001 }]
+    },
+    createDevice() {
+      opened += 1
+      throw new Error('passive inventory opened a serial port')
+    },
+  })
+
+  assert.equal(serialRequest.timeout, 750)
+  assert.equal(serialRequest.signal, controller.signal)
+  assert.equal(opened, 0)
+  assert.equal(result.devices.length, 1)
+  assert.equal(result.devices[0].address, '/dev/ttyACM1')
+  assert.equal(result.devices[0].status, 'unprobed')
+  assert.equal(result.devices[0].identity, null)
+})
+
+test('explicit inventory probing acquires and reads metadata without interrupting the REPL', async () => {
+  const controller = new AbortController()
+  let connection, inspection, disconnected = false
+  const result = await inventory({
+    interfaces: ['serial'], probe: true, probeTimeout: 1250, signal: controller.signal,
+  }, {
+    platform: 'linux',
+    async listSerial() { return [{ path: '/dev/ttyUSB7', vendorId: 0x1234 }] },
+    transportFor(row) { return { address: row.address } },
+    createDevice() {
+      return {
+        async connect(options) {
+          connection = options
+          return { identity: { deviceId: 'e8f60ae75642', board: 'TEST' } }
+        },
+        async inspect(options) { inspection = options; return { runtime: { vmReady: false } } },
+        async disconnect() { disconnected = true },
+      }
+    },
+  })
+
+  assert.equal(connection.role, 'unknown')
+  assert.equal(connection.timeout, 1250)
+  assert.equal(connection.signal, controller.signal)
+  assert.equal(connection.probeRepl, false)
+  assert.equal(inspection.signal, controller.signal)
+  assert.equal(disconnected, true)
+  assert.equal(result.devices[0].status, 'identified')
+  assert.deepEqual(result.devices[0].inspection, { runtime: { vmReady: false } })
+})
+
+test('inventory propagates an aborted serial enumeration', async () => {
+  const reason = new Error('cancelled')
+  await assert.rejects(
+    inventory({ interfaces: ['serial'], signal: AbortSignal.abort(reason) }, {
+      async listSerial({ signal }) { throw signal.reason },
+    }),
+    error => error === reason,
+  )
+})
+
+test('passive known ROM enumeration never opens, resets or claims firmware identity', async () => {
+  for (const productId of [2, 9, 18, 32]) {
+    const result = await inventory({ interfaces: ['serial'] }, {
+      platform: 'linux',
+      async listSerial() { return [{ path: '/dev/ttyACM1', vendorId: 0x303a, productId, product: 'ESP32 ROM' }] },
+      createDevice() { throw new Error('ROM port must not receive an EV-MUX probe') },
+      transportFor() { throw new Error('ROM port must not be opened as runtime') },
+    })
+    assert.equal(result.devices[0].status, 'rom')
+    assert.equal(result.devices[0].identity, null)
+    assert.equal(result.devices[0].interfaceSource, 'descriptor-candidate')
+    assert.equal(result.devices[0].error, undefined)
+  }
+})
+
+test('active ROM detection attempts normal boot before probing the rebound runtime once', async () => {
+  let reset = 0, connects = 0
+  const rom = { path: '/dev/ttyACM1', vendorId: 0x303a, productId: 32, serialNumber: '30eda0eda1b0', location: '1-2' }
+  const runtime = { ...rom, path: '/dev/ttyACM2', productId: 0x4023, product: 'ESP-VISION' }
+  const result = await inventory({ interfaces: ['serial'], probe: true }, {
+    platform: 'linux', listSerial: async () => [rom],
+    async probeRom(selected) { assert.deepEqual(selected, rom); reset++; return { port: runtime, probe: { attempted: true, outcome: 'runtime' } } },
+    transportFor(row) { assert.equal(row.address, runtime.path); return {} },
+    createDevice() { return {
+      async connect() { assert.equal(reset, 1); connects++; return { identity: { deviceId: rom.serialNumber } } },
+      async inspect() { return {} }, async disconnect() {},
+    } },
+  })
+  assert.equal(connects, 1)
+  assert.equal(result.devices[0].status, 'identified')
+  assert.equal(result.devices[0].romProbe.outcome, 'runtime')
+})
+
+test('failed SPI startup does not fabricate firmware identity or probe a stale ROM path', async () => {
+  for (const port of [null, { path: '/dev/ttyACM1' }]) {
+    const result = await inventory({ interfaces: ['serial'], probe: true }, {
+      platform: 'linux', listSerial: async () => [{ path: '/dev/ttyACM1', vendorId: 0x303a, productId: 32 }],
+      probeRom: async () => ({ port, probe: { attempted: true, outcome: port ? 'rom' : 'no-runtime' } }),
+      createDevice() { throw Error('No runtime may be opened') },
+    })
+    assert.equal(result.devices[0].status, port ? 'rom' : 'unidentified')
+    assert.equal(result.devices[0].identity, null)
+  }
+})
+
+for (const [code, status] of [['TIMEOUT', 'unidentified'], ['VERSION_MISMATCH', 'unidentified'],
+  ['SERIAL_BUSY', 'busy'], ['SESSION_BUSY', 'busy'], ['SERIAL_ACCESS_DENIED', 'permission-denied']]) {
+  test(`firmware detection keeps ${code} distinct from evidence of absent firmware`, async () => {
+    let closed = false
+    const result = await inventory({ interfaces: ['serial'], probe: true }, {
+      platform: 'linux',
+      async listSerial() { return [{ path: '/dev/ttyACM1', vendorId: 0x303a, productId: 0x4023, product: 'ESP-VISION' }] },
+      transportFor() { return {} },
+      createDevice() { return {
+        async connect() { throw Object.assign(new Error('probe failed'), { code }) },
+        async disconnect() { closed = true },
+      } },
+    })
+    assert.equal(result.devices[0].status, status)
+    assert.equal(result.devices[0].identity, null, 'USB product name cannot establish firmware identity')
+    assert.equal(result.devices[0].error.code, code)
+    assert.equal(closed, true)
+  })
+}

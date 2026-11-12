@@ -1,0 +1,96 @@
+# SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
+# SPDX-License-Identifier: Apache-2.0
+
+plugin_checks:
+  stage: check
+  image: node:24-bookworm-slim
+  tags: [build, internet, amd64]
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+    npm_config_cache: "$CI_PROJECT_DIR/.cache/npm"
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends python3 udev
+  script:
+    - export TMPDIR="$CI_PROJECT_DIR/.cache/plugin-tmp" TMP="$CI_PROJECT_DIR/.cache/plugin-tmp" TEMP="$CI_PROJECT_DIR/.cache/plugin-tmp"
+    - mkdir -p "$TMPDIR"
+    - node tools/ci/mcp/install_host.mjs --output .cache/plugin-core-artifacts
+    - npm --prefix host/esp-vision-plugin run build
+    - npm --prefix host/esp-vision-plugin test
+    - npm --prefix host/esp-vision-plugin run build:workbuddy-expert -- --ci --output-dir "$CI_PROJECT_DIR/.cache/workbuddy-expert"
+    - npm --prefix host/esp-vision-plugin run build:qoderwork -- --output-dir "$CI_PROJECT_DIR/.cache/qoderwork-plugin"
+    - npm --prefix host/esp-vision-plugin run build:cursor -- --output-dir "$CI_PROJECT_DIR/.cache/cursor-plugin"
+    - export ESP_VISION_NPM_TARBALL_DIR="$CI_PROJECT_DIR/.cache/plugin-npm-tarballs"
+    - node tools/ci/mcp/release_npm.mjs --dry-run --package host/esp-vision-plugin
+  artifacts:
+    name: "esp-vision-plugins-$CI_COMMIT_SHORT_SHA-$CI_PIPELINE_ID"
+    expose_as: 'Plugin candidates'
+    paths: [.cache/plugin-npm-tarballs/, .cache/workbuddy-expert/, .cache/qoderwork-plugin/, .cache/cursor-plugin/]
+    expire_in: 1 month
+
+package_plugin_npm:
+  stage: build_docs
+  extends: .rules:release
+  image: node:24-bookworm-slim
+  tags: [build, internet, amd64]
+  needs:
+    - job: plugin_checks
+      artifacts: false
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+    npm_config_cache: "$CI_PROJECT_DIR/.cache/npm"
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends python3 udev
+  script:
+    - export TMPDIR="$CI_PROJECT_DIR/.cache/plugin-release-tmp" TMP="$CI_PROJECT_DIR/.cache/plugin-release-tmp" TEMP="$CI_PROJECT_DIR/.cache/plugin-release-tmp"
+    - mkdir -p "$TMPDIR" .cache/plugin-release-tarballs
+    - node tools/ci/mcp/package_plugin_release.mjs --output .cache/plugin-release-tarballs
+    - node tools/ci/mcp/release_npm.mjs --dry-run --package host/esp-vision-plugin --tarball-dir .cache/plugin-release-tarballs
+  artifacts:
+    paths: [.cache/plugin-release-tarballs/]
+    expire_in: 1 month
+
+# Validate the source candidate before its new Core/CLI versions exist on npm.
+# Tag releases above still require published archives and registry integrity.
+plugin_release_checks:
+  extends: package_plugin_npm
+  script:
+    - export TMPDIR="$CI_PROJECT_DIR/.cache/plugin-release-tmp" TMP="$CI_PROJECT_DIR/.cache/plugin-release-tmp" TEMP="$CI_PROJECT_DIR/.cache/plugin-release-tmp"
+    - mkdir -p "$TMPDIR" .cache/plugin-release-tarballs
+    - node --test tools/ci/mcp/test_package_plugin_release.mjs
+    - node tools/ci/mcp/install_host.mjs --output .cache/plugin-release-core
+    - export ESP_VISION_NPM_TARBALL_DIR="$CI_PROJECT_DIR/.cache/plugin-release-tarballs"
+    - node tools/ci/mcp/release_npm.mjs --dry-run --package host/esp-vision-plugin
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - changes:
+        - ".gitlab/ci/plugin.yml"
+        - "tools/ci/mcp/package_plugin_release.mjs"
+        - "tools/ci/mcp/release_npm.mjs"
+        - "host/esp-vision-plugin/**/*"
+        - "host/device-cli/**/*"
+
+publish_plugin_npm:
+  stage: post_deploy
+  extends: .rules:release
+  image: node:24-bookworm-slim
+  tags: [build, internet, amd64]
+  needs:
+    - job: package_plugin_npm
+      artifacts: true
+    - job: qualify_firmware_release
+      artifacts: false
+    - job: device_cli_checks
+      artifacts: false
+    - job: evmux_host_checks
+      artifacts: false
+  resource_group: host-tools-npm-release
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+    npm_config_cache: "$CI_PROJECT_DIR/.cache/npm"
+  script:
+    - export TMPDIR="$CI_PROJECT_DIR/.cache/plugin-release-tmp" TMP="$CI_PROJECT_DIR/.cache/plugin-release-tmp" TEMP="$CI_PROJECT_DIR/.cache/plugin-release-tmp"
+    - mkdir -p "$TMPDIR"
+    - node tools/ci/mcp/release_npm.mjs --package host/esp-vision-plugin --tarball-dir .cache/plugin-release-tarballs

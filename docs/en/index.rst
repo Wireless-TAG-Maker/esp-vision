@@ -14,8 +14,11 @@ This guide is organized as follows.
    target-support/index
    get-started/index
    concepts/index
+   storage/index
    api-reference/index
    how-to/index
    architecture/index
+   communication/index
+   device-core/index
    project-relationship/index
    license/index

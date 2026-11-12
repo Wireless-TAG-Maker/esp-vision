@@ -7,7 +7,6 @@
 #include <string.h>
 
 #include "esp_err.h"
-#include "esp_heap_caps.h"
 
 #include "py/mphal.h"
 #include "py/obj.h"
@@ -24,6 +23,10 @@
 #include "camera.h"
 #include "ev_stdio.h"
 #include "py_image.h"
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL
+#include "camera_isp.h"
+#include "py_sensor_isp.h"
+#endif
 
 #ifdef NO_QSTR
 #define SENSOR_PIXFORMAT_GRAYSCALE (0)
@@ -33,25 +36,21 @@
 #define SENSOR_PIXFORMAT_RGB565    PIXFORMAT_RGB565
 #endif
 
-static uint8_t *s_snapshot_buf = NULL;
-static size_t s_snapshot_buf_size = 0;
-
 static void sensor_raise_esp_err(esp_err_t err)
 {
     mp_raise_msg_varg(&mp_type_OSError, MP_ERROR_TEXT("camera error: %s"), esp_err_to_name(err));
 }
 
-static void sensor_release_snapshot_buf(void)
+static void sensor_ensure_vm_task(void)
 {
-    if (s_snapshot_buf != NULL) {
-        heap_caps_free(s_snapshot_buf);
-        s_snapshot_buf = NULL;
+    if (!esp_vision_camera_is_vm_task()) {
+        mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("camera must run on the main VM task"));
     }
-    s_snapshot_buf_size = 0;
 }
 
 static void sensor_ensure_camera_ready(void)
 {
+    sensor_ensure_vm_task();
     if (!esp_vision_camera_is_ready()) {
         esp_err_t ret = esp_vision_camera_init();
         if (ret != ESP_OK) {
@@ -62,21 +61,11 @@ static void sensor_ensure_camera_ready(void)
 
 static uint8_t *sensor_get_snapshot_buf(size_t frame_size)
 {
-    if ((s_snapshot_buf != NULL) && (s_snapshot_buf_size >= frame_size)) {
-        return s_snapshot_buf;
-    }
-
-    sensor_release_snapshot_buf();
-    s_snapshot_buf = heap_caps_malloc(frame_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (s_snapshot_buf == NULL) {
-        s_snapshot_buf = heap_caps_malloc(frame_size, MALLOC_CAP_8BIT);
-    }
-    if (s_snapshot_buf == NULL) {
+    uint8_t *pixels = NULL;
+    if (esp_vision_camera_get_snapshot_buffer(frame_size, &pixels) != ESP_OK) {
         mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("failed to allocate snapshot buffer"));
     }
-
-    s_snapshot_buf_size = frame_size;
-    return s_snapshot_buf;
+    return pixels;
 }
 
 static void sensor_drop_frame(uint8_t *pixels, size_t frame_size)
@@ -89,9 +78,14 @@ static void sensor_drop_frame(uint8_t *pixels, size_t frame_size)
 
 static mp_obj_t sensor_reset(void)
 {
-    sensor_release_snapshot_buf();
+    sensor_ensure_vm_task();
+    esp_err_t ret = esp_vision_camera_shutdown();
+    if (ret != ESP_OK) {
+        sensor_raise_esp_err(ret);
+    }
+    esp_vision_camera_release_snapshot_buffer();
     esp_vision_camera_init0();
-    esp_err_t ret = esp_vision_camera_init();
+    ret = esp_vision_camera_init();
     if (ret != ESP_OK) {
         sensor_raise_esp_err(ret);
     }
@@ -101,14 +95,18 @@ static MP_DEFINE_CONST_FUN_OBJ_0(sensor_reset_obj, sensor_reset);
 
 static mp_obj_t sensor_shutdown(size_t n_args, const mp_obj_t *args)
 {
+    sensor_ensure_vm_task();
     bool enable = true;
     if (n_args > 0) {
         enable = mp_obj_is_true(args[0]);
     }
 
     if (enable) {
-        sensor_release_snapshot_buf();
-        esp_vision_camera_deinit();
+        esp_err_t ret = esp_vision_camera_shutdown();
+        if (ret != ESP_OK) {
+            sensor_raise_esp_err(ret);
+        }
+        esp_vision_camera_release_snapshot_buffer();
     } else {
         sensor_ensure_camera_ready();
     }
@@ -118,11 +116,15 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(sensor_shutdown_obj, 0, 1, sensor_shu
 
 static mp_obj_t sensor_set_pixformat(mp_obj_t pixformat_in)
 {
+    sensor_ensure_vm_task();
+    uint32_t previous = esp_vision_camera_get_pixformat();
     esp_err_t ret = esp_vision_camera_set_pixformat((uint32_t)mp_obj_get_int(pixformat_in));
     if (ret != ESP_OK) {
         sensor_raise_esp_err(ret);
     }
-    sensor_release_snapshot_buf();
+    if (esp_vision_camera_get_pixformat() != previous) {
+        esp_vision_camera_release_snapshot_buffer();
+    }
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(sensor_set_pixformat_obj, sensor_set_pixformat);
@@ -135,11 +137,17 @@ static MP_DEFINE_CONST_FUN_OBJ_0(sensor_get_pixformat_obj, sensor_get_pixformat)
 
 static mp_obj_t sensor_set_framesize(mp_obj_t framesize_in)
 {
+    sensor_ensure_vm_task();
+    uint32_t previous_width = esp_vision_camera_get_width();
+    uint32_t previous_height = esp_vision_camera_get_height();
     esp_err_t ret = esp_vision_camera_set_framesize((esp_vision_camera_framesize_t)mp_obj_get_int(framesize_in));
     if (ret != ESP_OK) {
         sensor_raise_esp_err(ret);
     }
-    sensor_release_snapshot_buf();
+    if ((esp_vision_camera_get_width() != previous_width) ||
+            (esp_vision_camera_get_height() != previous_height)) {
+        esp_vision_camera_release_snapshot_buffer();
+    }
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(sensor_set_framesize_obj, sensor_set_framesize);
@@ -183,6 +191,7 @@ static MP_DEFINE_CONST_FUN_OBJ_0(sensor_get_id_obj, sensor_get_id);
 
 static mp_obj_t sensor_set_hmirror(mp_obj_t enable_in)
 {
+    sensor_ensure_vm_task();
     esp_err_t ret = esp_vision_camera_set_hmirror(mp_obj_is_true(enable_in));
     if (ret != ESP_OK) {
         sensor_raise_esp_err(ret);
@@ -199,6 +208,7 @@ static MP_DEFINE_CONST_FUN_OBJ_0(sensor_get_hmirror_obj, sensor_get_hmirror);
 
 static mp_obj_t sensor_set_vflip(mp_obj_t enable_in)
 {
+    sensor_ensure_vm_task();
     esp_err_t ret = esp_vision_camera_set_vflip(mp_obj_is_true(enable_in));
     if (ret != ESP_OK) {
         sensor_raise_esp_err(ret);
@@ -212,6 +222,33 @@ static mp_obj_t sensor_get_vflip(void)
     return mp_obj_new_bool(esp_vision_camera_get_vflip());
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(sensor_get_vflip_obj, sensor_get_vflip);
+
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL
+static mp_obj_t sensor_set_ipa(mp_obj_t enable_in)
+{
+    sensor_ensure_vm_task();
+    esp_err_t ret = esp_vision_camera_set_ipa(mp_obj_is_true(enable_in));
+    if (ret != ESP_OK) {
+        sensor_raise_esp_err(ret);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(sensor_set_ipa_obj, sensor_set_ipa);
+
+static mp_obj_t sensor_get_ipa(void)
+{
+    bool enabled = false;
+    esp_err_t ret = esp_vision_camera_get_ipa(&enabled);
+    if (ret == ESP_ERR_NOT_SUPPORTED) {
+        return mp_const_none;
+    }
+    if (ret != ESP_OK) {
+        sensor_raise_esp_err(ret);
+    }
+    return mp_obj_new_bool(enabled);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(sensor_get_ipa_obj, sensor_get_ipa);
+#endif
 
 static mp_obj_t sensor_skip_frames(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
@@ -336,6 +373,13 @@ static const mp_rom_map_elem_t sensor_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_get_hmirror), MP_ROM_PTR(&sensor_get_hmirror_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_vflip), MP_ROM_PTR(&sensor_set_vflip_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_vflip), MP_ROM_PTR(&sensor_get_vflip_obj) },
+#if ESP_VISION_ENABLE_CAMERA_IPA_CONTROL
+    { MP_ROM_QSTR(MP_QSTR_set_ipa), MP_ROM_PTR(&sensor_set_ipa_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_ipa), MP_ROM_PTR(&sensor_get_ipa_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_ipa_stats), MP_ROM_PTR(&sensor_get_ipa_stats_obj) },
+    { MP_ROM_QSTR(MP_QSTR_set_isp), MP_ROM_PTR(&sensor_set_isp_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_isp), MP_ROM_PTR(&sensor_get_isp_obj) },
+#endif
     { MP_ROM_QSTR(MP_QSTR_skip_frames), MP_ROM_PTR(&sensor_skip_frames_obj) },
     { MP_ROM_QSTR(MP_QSTR_snapshot), MP_ROM_PTR(&sensor_snapshot_obj) },
     { MP_ROM_QSTR(MP_QSTR_evmux), MP_ROM_PTR(&sensor_evmux_obj) },

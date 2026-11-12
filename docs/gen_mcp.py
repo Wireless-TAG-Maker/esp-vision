@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Extract a machine-readable API knowledge pack from the ESP-VISION single
-# sources of truth, for the documentation MCP service (see the website repo
-# docs/09 and docs/10). Two API surfaces are extracted:
+# sources of truth, for the Knowledge MCP runtime in host/knowledge-mcp.
+# Two API surfaces are extracted:
 #
 #   1. ESP-VISION public modules  -- from stubs/*.pyi (the signature SSOT;
 #      reuses docs/gen_api.py's AST helpers so signatures never drift).
@@ -17,7 +17,7 @@
 #     python docs/gen_mcp.py v0.0.0-dev --out /path/to/mcp-pack.json
 #
 # This is a build artifact: deterministic, diffable, offline-buildable. It is
-# regenerated in CI and published alongside the docs (see docs/10 plan).
+# regenerated in CI and embedded in Knowledge MCP release artifacts.
 
 import argparse
 import ast
@@ -64,7 +64,9 @@ def _extract_espvision_module(module: str) -> dict:
     symbols: List[dict] = []
 
     def func_symbol(nodes, kind, owner=None):
-        signatures = [gen_api._build_signature(n.name, n.args) for n in nodes]
+        signatures = [gen_api._build_signature(n.name, n.args)
+                      + (' -> ' + ast.get_source_segment(source, n.returns) if n.returns else '')
+                      for n in nodes]
         arg_names: List[str] = []
         for n in nodes:
             arg_names.extend(gen_api._collect_arg_names(n.args))
@@ -134,6 +136,30 @@ def _extract_espvision_module(module: str) -> dict:
             mt = _symbol_targets(module, 'methods', sym['name'])
             sym['targets'] = list(mt) if mt else default_targets
             symbols.append(sym)
+
+    # Export aliases of public classes and their methods. Type aliases such as
+    # TensorInput = object are not runtime API symbols and are left alone.
+    canonical = {s['name']: s for s in symbols}
+    for node in tree.body:
+        if not (isinstance(node, ast.Assign) and isinstance(node.value, ast.Name)):
+            continue
+        original = canonical.get(node.value.id)
+        if not original or original['kind'] != 'class':
+            continue
+        for target in node.targets:
+            if not isinstance(target, ast.Name) or target.id in canonical:
+                continue
+            for name, symbol in canonical.items():
+                if name != node.value.id and not name.startswith(node.value.id + '.'):
+                    continue
+                alias = dict(symbol)
+                alias['name'] = target.id + name[len(node.value.id):]
+                alias['aliasOf'] = module + '.' + name
+                alias['doc'] = 'Alias of {}. {}'.format(alias['aliasOf'], symbol['doc']).strip()
+                if symbol['kind'] == 'class':
+                    alias['signatures'] = [target.id + sig[len(node.value.id):]
+                                           for sig in symbol['signatures']]
+                symbols.append(alias)
 
     return {
         'name': module,
@@ -354,7 +380,8 @@ def extract_micropython() -> List[dict]:
 
 EXAMPLE_DIR = os.path.join(REPO_ROOT, 'example')
 PROSE_SECTIONS = ('introduction', 'get-started', 'concepts', 'how-to',
-                  'architecture', 'target-support', 'project-relationship')
+                  'architecture', 'communication', 'device-core', 'target-support',
+                  'project-relationship', 'storage')
 _IMPORT_RE = re.compile(r'^\s*(?:import|from)\s+([A-Za-z_][\w]*)', re.M)
 
 
@@ -427,12 +454,35 @@ def _rst_prose(path: str) -> Tuple[str, str, List[str]]:
             indent = len(m.group(1))
             directive, arg = m.group(2), m.group(3)
             body, nxt = _block_body(lines, i + 1, indent)
-            if directive in ('code-block', 'code', 'sourcecode') and 'python' in arg:
+            if directive in ('code-block', 'code', 'sourcecode'):
                 code = _dedent(body)
                 if code:
-                    code_blocks.append(code)
-                    out.append('\n```python\n' + code + '\n```\n')
-            # other directives (blockdiag, list-table, only, seealso, ...) skipped
+                    if 'python' in arg:
+                        code_blocks.append(code)
+                    out.append('\n```' + arg + '\n' + code + '\n```\n')
+            elif directive == 'list-table':
+                rows = []
+                for line in body:
+                    cell = re.match(r'^\s*(\* -|-)\s+(.*)$', line)
+                    if cell:
+                        if cell.group(1) == '* -':
+                            rows.append([])
+                        if rows:
+                            rows[-1].append(_clean_inline(cell.group(2)))
+                    elif rows and rows[-1] and line.strip():
+                        rows[-1][-1] += ' ' + _clean_inline(line.strip())
+                if rows:
+                    if arg:
+                        out.append('\n' + _clean_inline(arg) + '\n')
+                    width = max(len(row) for row in rows)
+                    for row_index, row in enumerate(rows):
+                        cells = [cell.replace('|', '\\|') for cell in row]
+                        cells += [''] * (width - len(cells))
+                        out.append('| ' + ' | '.join(cells) + ' |')
+                        if row_index == 0:
+                            out.append('| ' + ' | '.join(['---'] * width) + ' |')
+                    out.append('')
+            # Diagram/toctree and other presentation directives are skipped.
             i = nxt
             continue
         if stripped.startswith('..'):  # comments / orphan directives
@@ -452,7 +502,7 @@ def extract_docs() -> List[dict]:
         if not os.path.isdir(d):
             continue
         for fn in sorted(os.listdir(d)):
-            if not fn.endswith('.rst') or fn == 'index.rst':
+            if not fn.endswith('.rst') or (fn == 'index.rst' and section != 'storage'):
                 continue
             title, text, code = _rst_prose(os.path.join(d, fn))
             doc_id = '{}/{}'.format(section, fn[:-4])
@@ -481,7 +531,7 @@ def build_capabilities() -> List[dict]:
 def build_pack(version: str) -> dict:
     try:
         sha = subprocess.check_output(
-            ['git', '-C', REPO_ROOT, 'rev-parse', '--short', 'HEAD']
+            ['git', '-C', REPO_ROOT, 'rev-parse', 'HEAD']
         ).decode().strip()
     except Exception:
         sha = 'unknown'

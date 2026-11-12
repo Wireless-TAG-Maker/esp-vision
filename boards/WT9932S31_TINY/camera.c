@@ -108,6 +108,10 @@ static void esp_vision_camera_set_defaults(void)
 
 void esp_vision_camera_init0(void)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return;
+    }
+    esp_vision_camera_invalidate_observed_frame();
     if (esp_vision_camera_cleanup() != ESP_OK) {
         ESP_LOGE(TAG, "camera resources remain active after soft reset");
         return;
@@ -756,6 +760,9 @@ fail:
 
 esp_err_t esp_vision_camera_init(void)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
     esp_err_t ret = ESP_OK;
     const char *stage = "start";
 
@@ -793,9 +800,18 @@ esp_err_t esp_vision_camera_init(void)
     return ret;
 }
 
+esp_err_t esp_vision_camera_shutdown(void)
+{
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    esp_vision_camera_invalidate_observed_frame();
+    return esp_vision_camera_cleanup();
+}
+
 void esp_vision_camera_deinit(void)
 {
-    esp_err_t ret = esp_vision_camera_cleanup();
+    esp_err_t ret = esp_vision_camera_shutdown();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "camera shutdown failed: %s", esp_err_to_name(ret));
     }
@@ -814,6 +830,9 @@ bool esp_vision_camera_is_ready(void)
 
 esp_err_t esp_vision_camera_set_pixformat(uint32_t pixfmt)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
     if ((pixfmt != PIXFORMAT_RGB565) && (pixfmt != PIXFORMAT_GRAYSCALE)) {
         return ESP_ERR_NOT_SUPPORTED;
     }
@@ -823,6 +842,7 @@ esp_err_t esp_vision_camera_set_pixformat(uint32_t pixfmt)
         return ESP_OK;
     }
 
+    esp_vision_camera_invalidate_observed_frame();
     s_camera.output_pixfmt = (pixformat_t)pixfmt;
     if (s_camera.initialized) {
         return esp_vision_camera_reinit_ppa();
@@ -837,6 +857,9 @@ uint32_t esp_vision_camera_get_pixformat(void)
 
 esp_err_t esp_vision_camera_set_framesize(esp_vision_camera_framesize_t framesize)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
     uint32_t width = 0;
     uint32_t height = 0;
     esp_err_t ret = esp_vision_camera_get_framesize_dimensions(framesize, &width, &height);
@@ -849,6 +872,7 @@ esp_err_t esp_vision_camera_set_framesize(esp_vision_camera_framesize_t framesiz
         return ESP_OK;
     }
 
+    esp_vision_camera_invalidate_observed_frame();
     s_camera.width = width;
     s_camera.height = height;
     if (s_camera.initialized && !esp_vision_camera_is_ready()) {
@@ -869,6 +893,12 @@ uint32_t esp_vision_camera_get_height(void)
 
 esp_err_t esp_vision_camera_set_hmirror(bool enable)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (s_camera.hmirror != enable) {
+        esp_vision_camera_invalidate_observed_frame();
+    }
     s_camera.hmirror = enable;
     return ESP_OK;
 }
@@ -880,6 +910,12 @@ bool esp_vision_camera_get_hmirror(void)
 
 esp_err_t esp_vision_camera_set_vflip(bool enable)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (s_camera.vflip != enable) {
+        esp_vision_camera_invalidate_observed_frame();
+    }
     s_camera.vflip = enable;
     return ESP_OK;
 }
@@ -918,8 +954,11 @@ static void esp_vision_camera_copy_scaled(uint8_t *pixels)
     }
 }
 
-esp_err_t esp_vision_camera_capture(uint8_t *pixels, size_t pixels_size)
+esp_err_t esp_vision_camera_capture_into(uint8_t *pixels, size_t pixels_size)
 {
+    if (!esp_vision_camera_is_vm_task()) {
+        return ESP_ERR_INVALID_STATE;
+    }
     struct v4l2_buffer buf;
     bool dequeued = false;
     esp_err_t ret;

@@ -23,11 +23,9 @@
 #define ESP_VISION_JPEG_QUALITY_HIGH                (60)
 #define ESP_VISION_JPEG_QUALITY_THRESHOLD           (320 * 240 * 2)
 
-/* OV3640 DVP camera configuration. */
+/* OV3640 native VGA input; SC101IOT uses its native 1280x720 mode. */
 #define ESP_VISION_CAMERA_RAW_INPUT_WIDTH           (640)
 #define ESP_VISION_CAMERA_RAW_INPUT_HEIGHT          (480)
-#define ESP_VISION_CAMERA_ACTIVE_INPUT_WIDTH        (640)
-#define ESP_VISION_CAMERA_ACTIVE_INPUT_HEIGHT       (480)
 #define ESP_VISION_CAMERA_PPA_OUTPUT_QQVGA_WIDTH    (120)
 #define ESP_VISION_CAMERA_PPA_OUTPUT_QQVGA_HEIGHT   (160)
 #define ESP_VISION_CAMERA_PPA_OUTPUT_QVGA_WIDTH     (240)
@@ -36,6 +34,7 @@
 #define ESP_VISION_CAMERA_PPA_OUTPUT_VGA_HEIGHT     (640)
 #define ESP_VISION_CAMERA_BUFFER_COUNT              (3)
 #define ESP_VISION_CAMERA_POWER_STABILIZATION_MS    (20)
+#define ESP_VISION_CAMERA_PWDN_WAKE_DELAY_MS         (20)
 #define ESP_VISION_CAMERA_SCCB_I2C_PORT             (0)
 #define ESP_VISION_CAMERA_SCCB_I2C_SCL_PIN          (1)
 #define ESP_VISION_CAMERA_SCCB_I2C_SDA_PIN          (0)
@@ -70,5 +69,17 @@
 #define ESP_VISION_LCD_PIN_CS                       (50)
 #define ESP_VISION_LCD_PIN_RST                      (44)
 #define ESP_VISION_LCD_PIN_POWER                    (60)
+
+/* EV-MUX v4 physical defaults and background Wi-Fi/TCP policy.
+ * Native/Hosted WLAN is enabled separately in the port/IDF configuration.
+ * Factory credentials apply only when no saved NVS profile exists.
+ */
+#define ESP_VISION_ENABLE_BACKGROUND_NETWORK       (1)
+#define ESP_VISION_WIFI_DEFAULT_SSID                ""
+#define ESP_VISION_WIFI_DEFAULT_PASSWORD            ""
+#define ESP_VISION_TRANSPORT_DEFAULT_SINK          "usb"
+#define ESP_VISION_TRANSPORT_FALLBACK_SINK         "usb"
+#define ESP_VISION_ENABLE_TCP_TRANSPORT            (1)
+#define ESP_VISION_TCP_PORT                        (3232)
 
 #endif /* ESP_VISION_BOARD_CONFIG_H */

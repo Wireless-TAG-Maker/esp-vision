@@ -1,0 +1,83 @@
+{
+  "name": "@esp-vision/device-core",
+  "version": "0.8.0",
+  "description": "Shared EV-MUX, framed REPL, device session, and action contracts for ESP Vision clients.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./evmux": "./src/evmux.js",
+    "./evrepl": "./src/evrepl.js",
+    "./session": "./src/device_session.js",
+    "./actions": "./src/device_actions.js",
+    "./bindings": "./src/device_bindings.js",
+    "./firmware": "./src/firmware.js",
+    "./discovery": "./src/network_discovery.js",
+    "./discovery/node": "./src/network_discovery_node.js",
+    "./node": "./src/node.js",
+    "./browser": "./src/browser.js"
+  },
+  "files": [
+    "src/*.js",
+    "schemas/",
+    "CHANGELOG.md",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "tests/*.mjs",
+    "tests/fixtures/*.py",
+    "scripts/*.mjs"
+  ],
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node scripts/run-tests.mjs",
+    "check:schema": "node scripts/generate-action-schema.mjs --check",
+    "schema:actions": "node scripts/generate-action-schema.mjs",
+    "check:package": "node tests/check-package.mjs",
+    "release:check": "npm test && npm run check:schema && npm run check:browser && npm run check:package && node scripts/release-npm.mjs --dry-run",
+    "release:npm": "node scripts/release-npm.mjs",
+    "prepublishOnly": "npm run release:check",
+    "test:hardware": "node tests/hardware-check.mjs",
+    "check:browser": "node tests/check-browser.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/espressif/esp-vision.git",
+    "directory": "host/device-core"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "homepage": "https://vision.espressif.com/",
+  "keywords": [
+    "esp-vision",
+    "espressif",
+    "esp32",
+    "micropython",
+    "ev-mux"
+  ],
+  "peerDependencies": {
+    "multicast-dns": "^7.2.5"
+  },
+  "peerDependenciesMeta": {
+    "multicast-dns": {
+      "optional": true
+    }
+  },
+  "optionalDependencies": {
+    "@serialport/bindings-cpp": "13.0.0",
+    "koffi": "2.16.3",
+    "multicast-dns": "^7.2.5"
+  },
+  "dependencies": {
+    "esptool-js": "0.7.1",
+    "smol-toml": "^1.7.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  },
+  "espVisionReleaseType": "minor"
+}

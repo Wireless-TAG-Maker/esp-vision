@@ -65,4 +65,13 @@
 #define ESP_VISION_SDCARD_D2_PIN                    (22)
 #define ESP_VISION_SDCARD_D3_PIN                    (23)
 
+/* EV-MUX starts on USB-Serial/JTAG and routes to the active session owner. */
+#define ESP_VISION_ENABLE_BACKGROUND_NETWORK       (1)
+#define ESP_VISION_WIFI_DEFAULT_SSID                ""
+#define ESP_VISION_WIFI_DEFAULT_PASSWORD            ""
+#define ESP_VISION_TRANSPORT_DEFAULT_SINK          "usj"
+#define ESP_VISION_TRANSPORT_FALLBACK_SINK         "usj"
+#define ESP_VISION_ENABLE_TCP_TRANSPORT            (1)
+#define ESP_VISION_TCP_PORT                        (3232)
+
 #endif /* ESP_VISION_BOARD_CONFIG_H */

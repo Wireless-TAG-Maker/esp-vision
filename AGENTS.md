@@ -1,76 +1,77 @@
-# AGENTS.md
+# Repository guide for coding agents
 
-This file provides guidance to AI coding agents working with code in this repository.
+ESP-VISION contains the MicroPython vision firmware for ESP32-P4/S3/S31 and the independently versioned `@esp-vision/device-core` host SDK. IDE, Agent, CLI and custom hosts share Device Core above EV-MUX v4; IDE/Agent applications live in separate repositories and consume the npm package.
 
-ESP-VISION is a MicroPython vision runtime for ESP32-P4 / ESP32-S3 boards. It builds a custom firmware: the upstream MicroPython esp32 port plus an overlay, ESP-VISION C modules (`sensor`, `image`, `display`, `espdl`, `tflite`, the P4-only `h264` and `rtsp`, plus the `image.ImageIO` stream type), a self-written platform layer (camera, preview, display, storage, USB, H.264), and OpenMV's MIT `imlib` as a vision component. The VSCode host tool lives in a separate repo.
+Keep this file focused on shared repository agreements and navigation. Put implemented contracts, supported limits and maintained usage instructions in the linked component guides. Keep personal settings and work-in-progress records outside the checkout.
 
-## Build Commands
+## Repository content boundary
 
-The repository-root `idf.py --board <BOARD> ...` entry point is provided through `idf_ext.py`. It builds the generated MicroPython copy under `build/micropython/idf<ESP_IDF_VERSION>/micropython/ports/esp32`; never create a standalone IDF app at the repo root.
+This shared repository contains reviewed project deliverables: source, reproducible tests and fixtures, shared build/CI configuration, public package metadata, and maintained documentation of implemented behavior. A document is not a deliverable merely because an agent created it, a task finished, or it was placed under `docs/`.
 
-- Build: `idf.py --board ESP32_P4X_EYE build`
-- Build + flash: `idf.py --board ESP32_P4X_EYE -p /dev/ttyACM0 build flash`
-- Serial monitor: `idf.py --board ESP32_P4X_EYE -p /dev/ttyACM0 monitor`
-- Menuconfig: `idf.py --board ESP32_P4X_EYE menuconfig`
-- Size: `idf.py --board ESP32_P4X_EYE size`
-- Erase flash: `idf.py --board ESP32_P4X_EYE erase-flash`
-- Clean board build output: `idf.py --board ESP32_P4X_EYE clean`
-- Wipe board build output: `idf.py --board ESP32_P4X_EYE fullclean`
-- Requires ESP-IDF release/v5.5, release/v6.0, release/v6.1, or master with `idf.py` on `PATH` (source the IDF `export.sh` if it isn't).
+- Never commit personal configuration, credentials, local environment/device settings, agent memory or transcripts, reasoning traces, temporary plans, design proposals, investigation diaries, handoff notes, experiment output or raw validation reports. Do not create `specs/` for agent work or relocate these records into documentation to make them committable.
+- Before creating a file, decide its audience and lifecycle. Keep working material in the external workspace selected by `ESP_VISION_WORK_DIR`; put review evidence and unresolved follow-ups in the MR/issue or CI artifacts. Extract only verified, maintained contracts into the existing documentation structure, updating both languages where applicable. Keep reusable test code and sanitized fixtures, not one-off execution results.
+- Keep user-specific paths, shell aliases, credentials and agent preferences in local configuration outside the checkout. Shared instructions must use configurable paths and portable commands. Shipped plugin manifests and Skills under `host/esp-vision-plugin/` are product source, not permission to commit personal agent settings elsewhere.
+- Before committing, inspect `git status --short`, `git diff --cached --name-status` and the complete staged diff. Stage explicit task files; exclude unrelated work and audit each added file against this boundary. Update the changelog and run `python tools/ci/check_repository_hygiene.py`. The check inspects the index, including force-added ignored files, and also runs in pre-commit and CI.
+- Ignore rules and the path check prevent known artifact locations; they cannot classify arbitrary prose or detect every secret. Review content regardless of its filename. Never use `git add -f` or a new exception to bypass this boundary for working material. Preserve existing uncommitted work outside the checkout before removing it; do not delete another task's files as cleanup.
 
-Notes:
-- `BOARD` must exist as `boards/<BOARD>/` with a `boards/<BOARD>/port/` subdirectory. Use an ESP-IDF version supported by the selected board; board-specific compatibility is defined and validated by the build configuration.
-- After changing the build system, board config, platform drivers, or imlib options, verify the `ESP32_P4X_EYE` build first; other boards only when the task touches them.
-- Firmware build/flash/monitor/config commands first prepare the MicroPython tree: `idf_ext.py` asserts `lib/micropython` is at the pinned commit (`v1.28.0`, `e0e9fbb17ed6fd06bb76e266ae554784c9c80804`), recreates a clean MicroPython copy under `build/micropython/`, applies `overlay/micropython/` to that copy, then projects each `boards/<BOARD>/port/` onto the copy's `ports/esp32/boards/<BOARD>/`. This build-copy strategy does not dirty `lib/micropython`.
+## Start here
 
-## Lint & Checks
+| Task | Implementation / entry point | Reference |
+| --- | --- | --- |
+| Architecture and boundaries | `platform/`, `modules/`, `host/` | [Architecture](docs/en/architecture/index.rst) |
+| Device Core installation and API | [Package](host/device-core/README.md), `host/device-core/src/index.js` | [SDK guide](docs/en/device-core/index.rst), [API](docs/en/device-core/api.rst), [advanced exports](docs/en/device-core/advanced.rst) |
+| Host CLI and device discovery | `host/device-core/src/cli.js`, `node_inventory.js`, `network_discovery*.js` | [CLI](docs/en/device-core/cli.rst) |
+| EV-MUX, ownership and Python | `platform/ev_*.c`, `host/device-core/src/{evmux,evrepl,device_session}.js` | [Communication reference](docs/en/communication/index.rst) |
+| Network and identity | `platform/network_service.*`, `platform/device_identity.*` | [Discovery](docs/en/communication/network-discovery.rst) |
+| Camera and LCD capture | `platform/{camera,display,preview}.c`, `boards/<BOARD>/camera.c` | [Preview/capture](docs/en/communication/preview-debug.rst) |
+| Firmware builds and boards | `idf_ext.py`, `micropython.cmake`, `boards/<BOARD>/` | Board configuration and `.gitlab/ci/` |
+| Hardware acceptance | `host/device-core/tests/hardware-check.mjs`, `tools/ci/flash_and_test.py` | [Validation](docs/en/communication/validation.rst) |
+| Host plugin packaging and marketplace acceptance | `host/esp-vision-plugin/`, `tools/ci/mcp/` | [Plugin maintainer guide](host/esp-vision-plugin/README.md) |
+| Licensing | `LICENSE`, source headers, `host/device-core/NOTICE` | [License inventory](docs/en/license/index.rst) |
 
-There is no test suite; CI runs `pre-commit` and a firmware build matrix.
+Documentation lives in `docs/en/` and `docs/zh_CN/`; update both translations for changed behavior. Device Core's complete documentation belongs in this documentation center; its package README links there.
 
-- C/C++ formatting (astyle 3.4.7): `pre-commit run --all-files astyle_py`
-- Copyright/SPDX headers: `pre-commit run --all-files check-copyright`
-- Stub syntax (mirrors `python_stubs` CI job): `python -m py_compile stubs/*.pyi`
-- `components/imlib/`, `lib/micropython/`, `lib/ulab/`, `overlay/micropython/`, and OpenMV-sourced `modules/py_{helper,image,imageio,assert}.*` are excluded from formatting/copyright rewriting — do not re-include them or let the hooks touch upstream headers.
+## Implementation rules
 
-## Project Structure
+- The application SDK root exports `createDevice()`. Follow the grouped API in the API reference; protocol helpers have explicit package subpaths. Do not duplicate framing, session ownership or device workflows in IDE/Agent clients or new test scripts.
+- Public APIs and advertised capabilities must work end to end. No placeholder methods or simulated success; unsupported hardware/firmware returns explicit errors. EV-MUX v3 clients must use matching older firmware/tools, not compatibility branches inside the v4 SDK.
+- Transport adapters carry bytes. Device Core owns the host protocol/session; firmware owns device arbitration. Discovery and ROM flashing have separate lifecycles. USB-OTG and USB-Serial-JTAG are distinct interfaces; passive enumeration must not reset devices.
+- Keep Python module names OpenMV-compatible (`sensor`, `image`, `display`, `image.ImageIO`). Bindings in `modules/` handle object conversion; heavy work belongs in `platform/` or pure-C components. Use ESP-VISION names outside the upstream imlib headers/sources.
+- Handle allocation, DMA, PSRAM/cache, storage ownership and USB failure paths explicitly. Reuse lifetime-scoped buffers without reserving unused camera/LCD buffers at boot; release resources on failure, reconfiguration and shutdown.
+- Storage faults must keep the REPL/control transports alive. Automatic initialization is authorized only on exact `FR_NO_FILESYSTEM` by independent board policies: `ESP_VISION_STORAGE_FLASH_FORMAT_IF_NO_FILESYSTEM` defaults to `1`, and `ESP_VISION_STORAGE_SD_FORMAT_IF_NO_FILESYSTEM` defaults to `0`. Enabled policies may erase damaged or foreign data; data-preserving products must keep the relevant policy at `0`. Generic I/O/internal errors and missing NVS metadata do not authorize formatting; `storage.retry()` remains mount-only. Explicit recovery requires user confirmation and writer/handle checks. Follow [Storage and data protection](docs/en/storage/index.rst) for backup and Flash/SD interruption limits.
+- Prefer `overlay/micropython/` and `USER_C_MODULES` over modifying the MicroPython submodule. `components/imlib/` holds pure-C vision code; per-board camera backends override the platform defaults. Examples, Python stubs and models live in `example/`, `stubs/` and `models/`.
 
-Layered by whether code touches MicroPython (`mp_obj_t` / `py/*.h`):
+## Build and verify
 
-- `components/imlib/`: pure-C vision algorithms, IDF component, maintained as MIT. `upstream/` = OpenMV `lib/imlib` MIT files (keep close to upstream, record any adaptation); `include/` = contract headers + CMSIS shims (no `.c`); `compat/` = ESP-VISION contract impls (`array.c`, `fb_alloc.c`, `umm_malloc.c`).
-- `components/zxing/`: thin IDF component wrapping the `lib/zxing-cpp` submodule for the opt-in 1D barcode backend (`esp_vision_zxing.cpp` + `include/`/`compat/`). Only built into the `idf::zxing` target when a board sets `ESP_VISION_ENABLE_BARCODE`.
-- `platform/`: self-written ESP32 glue, may couple with MicroPython. `ev_channel.c`, `ev_mux.c`, `ev_control_transport.c`, and `ev_stdio.c` implement the EV-MUX transport; `preview.c` sends binary JPEG `preview.frame` frames when `img.flush()` calls `esp_vision_preview_flush`. `display.c` is the generic display layer; on Board Manager-backed boards it implements the `esp_vision_board_display_*` panel/backlight hooks itself from the generated Board Manager config, `sdcard.c` mounts at `/sdcard` (the board provides `esp_vision_board_sdcard_*` weak hooks), `usb_msc.c` exposes the on-flash FAT data partition `ffat`/`vfs` over TinyUSB MSC, `jpeg.c` selects hardware JPEG or the `esp_new_jpeg` software fallback, `h264.c` is the P4-only hardware H.264 encoder over `esp_h264`, and `debug.c` routes debug output. `main.c` replaces upstream MP `main.c` and owns startup init + the soft-reset loop. `camera.c` here is only weak-symbol placeholders (`ESP_ERR_NOT_SUPPORTED`) plus the shared framesize table; the real backend lives per-board in `boards/<BOARD>/camera.c` (P4X and S31 use `esp_video`/V4L2 + PPA, S3 uses `esp32-camera` — no esp_video/PPA).
-- `modules/`: the `USER_C_MODULES` binding layer (`py_*`). The MicroPython modules self-register via `MP_REGISTER_MODULE`: `image`, `sensor`, `display`, `espdl`, `tflite` (TensorFlow Lite Micro inference), plus the P4-only `h264` (hardware encoder) and `rtsp` (RTSP server). `py_imageio.c` provides the `image.ImageIO` type and `py_helper.c` is shared binding-layer helper code (neither is a standalone module). `espdl`/`tflite` are gated to esp32p4/s3/s31 and `h264`/`rtsp` to esp32p4 in `micropython.cmake`. Board-feature-gated qstrs live in `modules/qstrdefs_esp_vision.h`.
-- `boards/<BOARD>/`: per-board config — `boardconfig.h` (`ESP_VISION_*` macros), `imlib_config.h` (imlib switches), `manifest.py` (frozen modules), optional `camera.c`/`sdcard.c` overriding platform defaults, and optional `board.cmake` feature switches. Board Manager-backed boards keep their YAML, `sdkconfig.defaults.board`, and optional custom `setup_device.c` together under `bmgr/`, plus an `idf_component.yml` that the build merges into the main component manifest; the build projects that defaults file into the generated MicroPython board. The `boards/<BOARD>/port/` subdirectory holds the remaining MicroPython-port files (`mpconfigboard.cmake`/`.h`, `sdkconfig.board`, the per-board `sdkconfig.<short>`, `partitions-*.csv`, `board.json`/`board.md`) that the build projects onto `ports/esp32/boards/<BOARD>/`; it is excluded from the format/copyright hooks like `overlay/micropython/`.
-- `micropython.cmake`: the wiring hub — injects `platform/main.c` as MP main source, lists module/platform sources + include paths, gates target-specific modules (`espdl`/`tflite` on p4/s3/s31; `h264`/`rtsp` + `platform/h264.c` on p4), picks per-board backends when present, runs the ESP Board Manager code generator and adds its output when the board sets `ESP_VISION_USE_BOARD_MANAGER`, conditionally appends `zxing` to the main component's `IDF_COMPONENTS`, pulls in `ulab`.
-- `idf_ext.py`: repository-root `idf.py` extension; requires `--board`, prepares the generated MicroPython build copy, then redirects `idf.py` to that generated ESP32 port project.
-- `example/`: numbered MicroPython example scripts; `stubs/`: `.pyi` stubs for the C modules; `models/`: optional runtime model assets with metadata sidecars — `espdet/` (`.espdl` ESP-DL) and `tflite/` (`.tflite`).
+Use repository-root `idf.py --board <BOARD> ...` through `idf_ext.py`, with a supported ESP-IDF environment on `PATH`. It checks the pinned `lib/micropython` revision, creates a clean build copy, applies `overlay/micropython/`, and projects `boards/<BOARD>/port/` into it. Do not create a standalone root IDF application or edit generated build/Board Manager files. Board definitions and CI configuration determine supported board/IDF combinations.
 
-A board is defined in a single tree, `boards/<BOARD>/`: the ESP-VISION side at the top level, and the MicroPython port side (IDF target, sdkconfig, partitions, USB strings) under the `boards/<BOARD>/port/` subdirectory, which the build projects onto `ports/esp32/boards/<BOARD>/` of the generated MicroPython copy. Only shared sdkconfig fragments (e.g. upstream `sdkconfig.base`, `sdkconfig.p4_wifi_common`) remain in the MicroPython port itself.
+During experiments, compile only the board being tested, using an explicit build directory under a writable workspace outside the checkout. Set `ESP_VISION_WORK_DIR` to choose that workspace; the example defaults to `esp-vision` under the system temporary directory. Replace the board below with the actual test target:
 
-## Code Style & Conventions
+```sh
+export ESP_VISION_WORK_DIR="${ESP_VISION_WORK_DIR:-${TMPDIR:-/tmp}/esp-vision}"
+mkdir -p "$ESP_VISION_WORK_DIR/tmp"
+export TMPDIR="$ESP_VISION_WORK_DIR/tmp"
+export TMP="$TMPDIR" TEMP="$TMPDIR"
+idf.py --board ESP32_P4X_EYE -B "$ESP_VISION_WORK_DIR/build/ESP32_P4X_EYE" build
+```
 
-- Public Python module names stay OpenMV-compatible: the camera module is `sensor` (not `camera`); `image`, `display`, `espdl` alongside, with the codec stream exposed as `image.ImageIO`.
-- `omv_*` prefixes only appear under `components/imlib/upstream|include/`. `platform/` and `modules/` use ESP-VISION names. Keep board directory names aligned with `MICROPY_BOARD`. Use `ESP32_*` for Espressif board IDs and `WT9932*` for Wireless-Tag board IDs.
-- Bindings (`modules/`) only do object conversion + light API adaptation; push heavy logic into pure C or `platform/`.
-- Code touching DMA, PSRAM, cache coherency, PPA, or USB CDC/MSC must handle error paths explicitly. Avoid dynamic allocation on hot paths — reuse the framebuffer / `fb_alloc` / lifetime-scoped buffers.
-- Prefer changes via `overlay/` and `USER_C_MODULES` over editing `lib/micropython/`; only patch the submodule when genuinely unavoidable.
-- Don't commit build output, temporary sdkconfig files, logs, or local device paths.
-- Markdown (`.md`): don't hard-wrap prose — one line per paragraph or list item, let it soft-wrap. (Tables, code blocks, and front matter are exempt.)
+Prefer CI for the final firmware matrix after the feature is complete. SDK-only changes use `ESP_VISION_DEVICE_CORE_ONLY=1`; `ESP_VISION_BUILD_FIRMWARE=1` requests firmware validation. See CI rules for targeted filters.
 
-## Changelog
+- SDK changes: use Node.js 22+, install dependencies in `host/device-core` with `npm install --ignore-scripts --no-audit --no-fund --package-lock=false`, then run `npm run release:check` (tests, schema, package and publish dry run).
+- Firmware host checks: `python -m unittest discover -s tools/tests -p 'test_*.py' -v`.
+- Hardware checks: from `host/device-core`, start with `npm run test:hardware -- --help`; reuse this public-SDK entry point. CI flashing delegates to it through `tools/ci/flash_and_test.py`.
+- Development boards may be reflashed directly. Do not automatically back up or restore installed firmware, or add whole-flash/protected-region preservation reads before or after flashing; these operations are too slow for routine development. Keep normal programming verification appropriate to the task. Back up or restore firmware only when the user explicitly requests it.
+- Run applicable `pre-commit` hooks. Respect the upstream/generated exclusions in `.pre-commit-config.yaml`; never rewrite upstream license headers. Syntax-check changed stubs and validate bilingual documentation/MCP references when relevant.
+- Report tested boards, interfaces and commit/pipeline coverage accurately. Historical success does not validate a newer commit; canceled jobs are neither passing nor failing tests. Never format device storage to hide a test failure.
 
-- Every change intended for a commit or merge request must update the repository-root `CHANGELOG.md` in the same commit.
-- Each released version maps to a git tag. The first tag is the initial release and stays a one-liner (not detailed); later tags get real entries.
-- Accumulate new changes under `## [Unreleased]`, grouped as `Added` / `Changed` / `Fixed` / `Removed`. At release time, rename the `[Unreleased]` block to the new tag.
+## Changes and releases
 
-## Licensing (high priority — this repo will be open-sourced)
+- Every committed change updates root `CHANGELOG.md` under `[Unreleased]`, grouped by Added/Changed/Fixed/Removed. SDK release changes also update its package changelog/version as appropriate; npm versions are independent of firmware versions. Git tags identify firmware/documentation releases, not SDK releases.
+- Device Core publication is controlled by `.gitlab/ci/device-core.yml`: relevant non-master changes run publish dry runs; actual npm publication uses protected master credentials. Do not expose tokens or commit secrets.
+- Use meaningful branch prefixes (`feat/`, `fix/`, `docs/`, etc.), never `codex/`. Load GitLab credentials through the developer's local credential setup or CI secret store without printing them; do not require a personal shell alias in shared instructions.
+- Keep temporary worktrees, builds, caches, logs and scratch scripts under the writable `ESP_VISION_WORK_DIR` workspace described above; set `TMPDIR`, `TMP` and `TEMP` accordingly. Use a persistent directory outside the checkout when artifacts must survive system temporary-directory cleanup. Do not commit generated output, local device paths or unrelated workspace changes.
+- Markdown prose uses one line per paragraph/list item; do not hard-wrap it.
 
-How license is assigned across the tree:
+## Licensing
 
-- Repo-original code (`platform/`, most of `modules/`, `boards/`, build files) is `SPDX-License-Identifier: Apache-2.0`. The `check-copyright` pre-commit hook enforces the Espressif Apache header on these files.
-- `components/imlib/` is maintained as MIT (OpenMV-derived). The one exception is `components/imlib/upstream/apriltag.c` (BSD-2-Clause); the README license table is the source of truth for per-component licenses.
-- `modules/py_{image,helper,imageio,assert}.*` are OpenMV MIT files kept with their original headers verbatim, and are excluded from the formatting/copyright hooks so the upstream headers are never rewritten.
-- Vendored submodules keep their own license: `lib/micropython` (MIT), `lib/ulab` (MIT), `lib/zxing-cpp` (Apache-2.0). Registry components (ESP-DL, esp_new_jpeg, esp32-camera, esp-tflite-micro, esp_h264, esp_media_protocols) keep theirs.
-- `OMV_NO_GPL=1` (set in `micropython.cmake` and `components/imlib/CMakeLists.txt`) keeps GPL-conditional OpenMV code (e.g. `agast.c`) out of the build — do not enable those paths.
-
-When adding third-party source: verify the license per file (don't infer it from the directory or repo), preserve the original header, and add an entry to the README license table. When a license is unclear, stop and ask rather than guess.
+Original firmware and Device Core code use Apache-2.0; preserve the SDK's historical MIT notices in `NOTICE`. Upstream MicroPython, OpenMV bindings/imlib, submodules and registry components retain their own per-file licenses and headers. Consult the linked license inventory instead of inferring a license from a directory; record new dependencies there. Keep `OMV_NO_GPL=1` and excluded GPL paths disabled. If third-party terms are unclear, ask before incorporating that source.

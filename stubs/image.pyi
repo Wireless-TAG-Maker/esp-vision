@@ -353,6 +353,8 @@ class apriltag:
 #: channels correspond to the LAB color space.
 class histogram:
     #: Combined bins (grayscale/binary) or L bins (RGB565).
+    #: Values are normalized floating-point pixel frequencies, not integer counts.
+    #: For a non-empty selection their sum is approximately 1.0 (floating-point rounding applies).
     def bins(self) -> list[float]: ...
     #: L-channel (lightness) bins.
     def l_bins(self) -> list[float]: ...
@@ -443,15 +445,13 @@ class statistics:
 class Image:
     #: Load an image from a file (BMP/PPM/PGM/JPEG/PNG depending on build).
     #: path: source file path.
-    #: copy_to_fb: True loads the decoded image into the frame buffer.
     @overload
-    def __init__(self, path: str, *, copy_to_fb: bool = False) -> None: ...
+    def __init__(self, path: str) -> None: ...
     #: Allocate a blank image of the given size and pixel format.
     #: width: image width in pixels.
     #: height: image height in pixels.
     #: pixformat: one of BINARY/GRAYSCALE/RGB565/BAYER/YUV422.
     #: buffer: optional external buffer to wrap instead of allocating.
-    #: copy_to_fb: True allocates the image in the frame buffer.
     @overload
     def __init__(
         self,
@@ -460,11 +460,10 @@ class Image:
         pixformat: int,
         *,
         buffer: Any | None = None,
-        copy_to_fb: bool = False,
     ) -> None: ...
     #: Wrap an existing array/buffer (e.g. an ndarray) as an image.
     @overload
-    def __init__(self, array: Any, *, buffer: Any | None = None, copy_to_fb: bool = False) -> None: ...
+    def __init__(self, array: Any, *, buffer: Any | None = None) -> None: ...
 
     #: Image width in pixels.
     def width(self) -> int: ...
@@ -486,7 +485,7 @@ class Image:
     def set_pixel(self, x: int, y: int, pixel: Color) -> Image: ...
     #: Push this image to the host as a binary EV-MUX ``preview.frame`` JPEG.
     def flush(self) -> None: ...
-    #: Save the image to a file; the format is inferred from the extension.
+    #: Save the image to a file; the format is inferred from the extension. PNG encoding is not enabled in current firmware.
     #: path: destination path.
     #: roi: optional source rectangle (x, y, w, h).
     #: quality: JPEG quality from 1 to 100 when saving as JPEG.
@@ -510,7 +509,6 @@ class Image:
         color_palette: Any | None = None,
         alpha_palette: Any | None = None,
         hint: int = 0,
-        transform: Any | None = None,
         copy: bool = True,
     ) -> Image: ...
     #: Crop/scale the image to a region of interest. Same options as copy().
@@ -551,7 +549,7 @@ class Image:
     #: quality: JPEG quality from 1 to 100.
     #: subsampling: one of the JPEG_SUBSAMPLING_* constants.
     def to_jpeg(self, *, quality: int = 90, subsampling: int = ..., copy: bool = False) -> Image: ...
-    #: Encode to PNG.
+    #: Encode to PNG (not enabled in current firmware).
     def to_png(self, *, copy: bool = False) -> Image: ...
 
     #: Fill the image with zeros (optionally only where mask is set).
@@ -680,7 +678,6 @@ class Image:
         color_palette: Any | None = None,
         alpha_palette: Any | None = None,
         hint: int = 0,
-        transform: Any | None = None,
         mask: Image | None = None,
     ) -> Image: ...
 

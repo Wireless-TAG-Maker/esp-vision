@@ -17,6 +17,7 @@ from esp_docs.conf_docs import *  # noqa: F403, F401
 # Keep a reference to ESP-Docs' own ``setup`` so our hook can chain to it
 # instead of shadowing it (the wildcard import above brings it into scope).
 _esp_docs_setup = globals().get('setup')
+extensions = list(extensions) + ['sphinxcontrib.mermaid']
 
 # Make the documentation generators importable.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -69,6 +70,10 @@ versions_url = './_static/versions.js'
 
 html_static_path = ['../_static']
 html_logo = '../_static/ESP-VISION_logo.svg'
+
+# ESP-Docs' vendored blockdiag and seqdiag render overlapping edge labels
+# with supersampling enabled. Keep sequence labels readable at native scale.
+seqdiag_antialias = False
 
 # PDF output filename prefix; ESP-Docs appends language and version.
 pdf_file_prefix = u'esp-vision'

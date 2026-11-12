@@ -1,0 +1,198 @@
+# Changelog
+
+## [Unreleased]
+
+### Fixed
+
+- Make hardware-check fixture uploads idempotent and acknowledged, verify source integrity and installation, and bound timeout recovery. Report bootstrap diagnostics and blocked dependent checks separately without allowing a failed prerequisite or cleanup to pass hardware acceptance.
+
+## 0.8.0
+
+### Changed
+
+- Replace host Python serial/enumeration and esptool subprocesses with npm native serial bindings and the shared esptool-js ROM engine used by the browser. Preserve identity, security, partition, verification and reset checks; remove defaultPython, nodeAdapterAssets and Python helper assets.
+- Package serial prebuilds in CLI and plugin artifacts, with a Linux USJ modem-control fallback that does not issue unsupported BREAK commands.
+
+- Speed up complete firmware installation by trusting checked, partition-bounded FFAT erase commands without erased-range reads, and reuse official esptool whole-write MD5 verification receipts in Node/browser adapters instead of transferring firmware back to the host. Keep SHA-256 qualification before writing and full readback for custom adapters without receipts.
+
+### Fixed
+
+- Preserve the original LAN discovery error message so dependency-loading failures can be distinguished from socket and network failures.
+
+- Drive the partial ROM-packet deadline regression with a controlled clock so CI scheduling delays cannot consume its successful receive budget.
+
+- Classify an occupied EV-MUX session as busy during firmware identification; USB descriptors, ROM responses and timeouts do not establish the presence or absence of ESP-VISION firmware.
+- Keep passive ROM enumeration non-opening; active firmware detection verifies the selected ROM MAC/security, attempts normal SPI boot once, then rebinds only its matching physical USB endpoint before the ESP-VISION handshake. Preserve unknown startup outcomes and require download re-entry when no runtime returns.
+
+## 0.7.0
+
+### Fixed
+
+- Allow a serial frame split across the initial 300 ms startup drain to finish within the parser's existing progress/total budgets while rejecting old frames and sending no hello. Freeze the total deadline across successive frames, fail when the parser discards an incomplete frame on timeout, and cancel boundary waits on abort or close; retain conservative failure for injected older parsers without receive-budget support. Add payload-free partial-frame timing/timeout diagnostics and regressions for split/coalesced startup data, bounded progress and cleanup.
+
+### Changed
+
+- Expose the browser ROM adapter's canonical factory `chipMac`, matching Node, and accept a strictly validated optional `expectedMac` before any port access. Bind initialization and baud recovery to that MAC as well as chip family/revision; mismatches preserve `ROM_IDENTITY_CHANGED` and close the adapter before another stub, erase or write. Keep initial manually selected ROM usage compatible when the option is omitted.
+
+- Clear and verify the S31 LP download latch at its own target address after programming, preserving unrelated bits before reset so software ROM entry can return to the application.
+
+- Explicit complete installation clears internal FAT filesystem files, including scripts and models, before writing firmware; application updates retain their existing data-preserving behavior. Hosts must explain this deletion before selecting install mode. Complete images may also replace NVS configuration; SD cards are not erased.
+- Require complete installations to derive the unencrypted writable `ffat` range from the hash-approved ESP partition table, verify layout/MD5, application bounds, chip/security and flash capacity, then erase and verify that exact range before any firmware write. Unsupported layouts/adapters, erase/read errors and cancellation before writing fail without reset or automatic retry.
+- Add `eraseRegion(address, size)` to the built-in browser/Node ROM stubs, using fixed official esptool primitives with sector-aligned bounds. Custom full-install adapters need the same capability; application-only adapters do not.
+- Bind installation qualification to private metadata/data snapshots. Cancellation is honored during erase and erased-range verification; once firmware writing starts, the existing complete-verification/reset policy remains in force.
+
+## 0.6.1
+
+### Fixed
+
+- Accept native Windows CRLF startup lines in the direct Python serial-failure regression so its diagnostic and payload-redaction assertions run on Windows.
+
+- Preserve bounded serial read/write OS diagnostics and unexpected Python bridge exit codes/signals instead of reducing them to CONNECTION_CLOSED; omit arbitrary exception text and all transferred bytes, and keep intentional disconnect/cancellation quiet.
+
+- Run package and release checks through npm's JavaScript entry point on Windows, preserving paths and arguments without a command shell; accept checkout CRLF in the generated action-schema check while still rejecting changed schema content.
+- Observe native USB re-enumeration for up to five seconds after read-only ROM initialization failure, requiring the same MAC and physical location before one verified runtime handoff; cancellation, ambiguous descriptors and failed reads/writes cannot replay operations.
+- Forward Node readback packet budgets to the external esptool 5.6.0 reader, using one outstanding 1 KiB packet by default and preserving its ACK/MD5 verification. Reject incompatible versions before initialization or writing and restore temporary instance settings after success or failure.
+
+## 0.6.0
+
+### Added
+
+- Negotiate runtime UART speed through the shared session, trying 2,000,000 → 1,500,000 → 921,600 → 460,800 → 115,200 bps until the first verified result; preserve legacy firmware and native USB behavior.
+- Expose a shared browser serial transport with safe internal reopen and preserve subscriptions; support live Node serial retuning through a binary-safe adapter control channel.
+- Require the firmware's versioned `debug.capture_frame.observed.v1` capability for camera observation. Camera capture observes the last successfully published independent camera frame; older unsafe implementations reject locally with `UNSUPPORTED_OPERATION` and a firmware-upgrade message, without issuing a capture RPC. Screen capture remains independent.
+
+### Changed
+
+- Declare this release as a minor version after 0.5.1. Device Core, CLI and Plugin retain independent publication lifecycles; a new Core release does not update existing CLI/Plugin bundles or authorize changing their registry locks.
+
+### Fixed
+
+- Rebind an explicitly selected native USB runtime to its matching ROM only after EV-MUX MAC/interface verification and one bootloader request. Wait for path readiness, preserve uncertain control/cleanup outcomes, and verify the actual ROM MAC before accepting writes; never replay initialization on the same loader.
+- Serialize bootloader handoff with session cleanup, drain Node serial output before closing its bridge, and discard obsolete leases without claiming an unobserved ROM acknowledgement. Preserve bounded ROM method/error details in CLI JSON diagnostics.
+- Identify existing ROM/stub connections without reset before a bounded reset fallback on descriptor-qualified UART bridges or USB Serial/JTAG; suppress reset fallback on native/unknown USB and close failed handles.
+
+- Validate binary capture and preview JPEG structure, table references, dimensions, scans and final EOI before delivery, after existing CRC and response correlation checks. Reject malformed or JPEG-less capture success with `INVALID_IMAGE`; drop invalid previews with diagnostics and counters, while preserving unrelated requests and recovery on the next good frame. This is bounded structural validation, without entropy decoding.
+- Return each `frame.capture` action's correlated image so concurrent, out-of-order responses cannot exchange images through shared state. Use self-created, independently decoded JPEG fixtures in source and installed-package regressions.
+- Replace the browser flashing backend with pinned official esptool-js, compressed writes, qualified pre-write speed fallback, direct USB-OTG ROM synchronization and bounded readback with validated trailing MD5 plus full SHA-256 verification.
+- Normalize signed SPI register responses to 24-bit JEDEC flash IDs and preserve chip/security, installation bounds, partition-layout and reset checks.
+
+- Invalidate the old lease after acknowledged or uncertain hard reset, block concurrent renegotiation, and serialize cleanup with reset so stale release failures cannot mask its result. Retain live leases after confirmed reset denials and discard explicit ownership rejections.
+
+## 0.5.1
+
+### Fixed
+
+- Make packaged execution-deadline regressions deterministic with a controlled clock, including expiry before VM entry, and keep installation guidance independent of temporary publication state.
+
+## 0.5.0
+
+### Changed
+
+- Move the host management CLI to the standalone `@esp-vision/device-cli` package and keep passive Node inventory helpers available from `@esp-vision/device-core/node`.
+
+### Fixed
+
+- Detach started Python runs from connection-lifetime cancellation after VM entry, so normal disconnect releases ownership without sending a remote stop; retain caller AbortSignal cancellation.
+
+- Wait for a private VM-entry sentinel before resolving detached Python startup, with bounded startup waits and session-isolated output.
+
+- Add validated `connect({ probeRepl: false })` for non-interrupting native RPC access and use it for metadata inventory probes; retain the existing active connection default.
+
+- Make aggregate deadlines optional by default for completed Python runs and file reads while retaining bounded REPL exchanges and per-chunk file-read limits.
+- Keep wait-mode small-source execution on the REPL until its completion sentinel arrives, without imposing a fixed program-completion timeout or requiring device storage.
+
+## 0.4.2
+
+### Fixed
+
+- Route browser ROM reset calls through the active flash stub after upload, preserving its two-byte status decoder during P4 watchdog register writes; report reset failure diagnostics without invalidating successful firmware verification.
+
+## 0.4.1
+
+### Fixed
+
+- Fail camera mode checks on allocation, timeout and unexpected errors instead of silently classifying those modes as unsupported; inspect optional storage state only when advertised.
+- Keep hardware-check fixtures in bounded RAM-only Python calls, independent of filesystem availability. Add expected board/firmware and required-check validation, report storage mount state, and reject explicit file acceptance on unmounted Flash without formatting.
+
+## 0.4.0
+
+### Added
+
+- Reuse browser cache only for hash-pinned release manifests and complete-BIN sources; retry a fetch-stage TypeError once with no-store for cached CORS recovery, while hash/HTTP/metadata failures and legacy app-only downloads retain strict failure/cache behavior.
+
+- Export immutable official release-manifest readers with publication/version/board/hash pinning and bounded, source-constrained validation of firmware, website, models and MCP snapshots; model files are unique by path while a group may share one slug, and normalized paths cannot escape the pinned source commit.
+- Support application updates from the qualified complete BIN through `image.source`, verifying the whole container and embedded segments before extracting the application; preserve explicit full installation and legacy app-only descriptors.
+
+- Export passive `openBrowserRom({ port, logger?, signal? })` at `/browser` with a lazily loaded, pinned tasmota browser backend; share verified Core firmware install/update workflows without host-maintained ROM patches.
+- Validate the real browser bundle, P4/S31 stub assets, adapter cleanup/cancellation and isolated package imports.
+
+## 0.3.0
+
+### Added
+
+- Export the passive built-in `openNodeRom({ port, python?, signal? })` adapter from `/node` so Node SDK hosts and the CLI share the same ROM implementation.
+
+- Explicit `mode: 'install'` on firmware check/update and CLI `--mode install` for blank-device ROM installation over USJ/UART, using qualified complete images with bootloader/partition/application hashes and flash-capacity checks. Default application-only updates retain their existing data-preservation contract; no automatic fallback or TCP OTA is introduced.
+
+### Fixed
+
+- Allow up to 151 seconds of bounded metadata propagation backoff after npm accepts publication, with ten uncached verification reads and no repeated publish.
+
+## 0.2.0
+
+### Changed
+
+- File and large-script uploads use one reliable binary `file.write` engine with 16 KiB blocks, integrity validation and cancellation cleanup; no Base64/JSON or REPL upload fallback. Public `files.write` and Python API signatures stay unchanged. Uploads require matching firmware capability `file.write.binary`; older v4 devices can still be inspected but must update firmware before upload.
+
+### Fixed
+
+- Verify newly published tarballs using bounded uncached registry reads instead of a single immediate npm view; retry transient metadata propagation/network failures without repeating publication, while failing immediately on access denial or integrity mismatch.
+
+## 0.1.1
+
+### Fixed
+
+- Expose `tcpTransport` and `serialTransport` through `@esp-vision/device-core/node`.
+- Include unit tests, hardware checks, fixtures and npm script targets in the tarball. Fail when no unit tests are found; validate imports, discovery and runnable checks from an isolated installed package.
+- Clarify `device.discover()` versus the provider's `list()` contract and document the shipped Node adapters and installed test commands.
+
+## 0.1.0 — Initial public release
+
+### Added
+
+- Added browser-safe and optional Node LAN discovery interfaces, TTL-aware DNS-SD collection, and selection-time device identity validation before EV-MUX acquisition.
+
+- Standalone, UI-independent EV-MUX v4 sessions, strict ownership/epoch filtering, framed REPL, files, execution, Wi-Fi controls and device-action contracts.
+- Verified firmware-flash adapter with injected ROM loader, image/security/partition checks, complete readback and masked P4 download-latch reset.
+- Public npm metadata, protected default-branch publishing, isolated tarball checks and verified/idempotent release retries. The package has no Agent/IDE runtime dependency or bundle; the official firmware index uses a small TOML parser, and Node discovery optionally uses multicast-dns.
+
+- Default official firmware discovery reads dl.espressif.com config and per-version metadata; legacy unqualified releases remain visible without enabling unsafe writes. CLI uses --port and a built-in esptool process adapter, removing the user-supplied JavaScript loader requirement.
+
+- Ship `esp-vision-device` management CLI: unified `inspect` passive/probed wired/LAN queries matching the SDK method name, platform-aware USB serial filtering with `--all-ports` for native UART/Bluetooth, numbered/grouped endpoints, strict configuration/control and catalog/version firmware commands. Reuse Core facade and one cross-platform Python serial/TCP adapter in both CLI and hardware checks.
+
+- Added `device.firmware.check()` and `device.firmware.update()` for complete board-version listing, exact-version selection, ordered release catalogs, board selection, validated application download, exclusive ROM handoff, readback verification and explicit reset/reconnection results.
+- Publish bilingual complete API documentation in the ESP-VISION documentation center from repository `docs/{en,zh_CN}/device-core/`; the npm README links to its online HTML pages.
+
+### Changed
+
+- License the npm package and ESP-VISION contributions under Apache-2.0, matching the firmware; retain historical MIT copyright/permission notices in the distributed NOTICE file.
+
+- Moved the SDK source and release checks from the IDE repository to `host/device-core` in the ESP-VISION firmware repository; npm name and independently versioned package contract are unchanged.
+
+- **Breaking:** the package root exports only `createDevice()`; the device class stays internal. Use the grouped application API for discovery, connection, inspection, configuration, control, Python, files, capture and events. Existing protocol, action-contract and ROM-flashing integrations remain on their explicit subpaths; the README includes a migration table.
+- Consolidated network mutations into `configure()` and reset/interrupt/download-mode requests into `control()`, with strict parameters, cancellation and shared-operation coordination.
+- Unified file access under `files` and execution under `python`, with acknowledged upload progress, directory-scoped enumeration and execution of existing paths without rewriting their contents.
+
+### Fixed
+
+- Preserve split mDNS address announcements during cache flush, reclaim expired cache entries, bound packet retention, and close discovery sockets when cancellation occurs during setup.
+- Soft reset requires a newer ready epoch and a real REPL barrier within one deadline; caller cancellation reaches all stages and device-action adapters.
+- Bounded file reads reject incomplete/changing content; serial startup drain, TCP frame deadlines and keepalive recovery follow the v4 contract.
+
+- Align discovery output by Unicode display width instead of tabs; fall back to aligned, wrapped device blocks on narrow terminals without truncating identifiers.
+
+- Generate script completion inside the executing statement so `input()` receives only user input; retain output arriving in the same frame as completion.
+- Return binary image results correlated to the requesting sequence instead of a shared last-image slot. LCD capture uses the dedicated `debug.capture_screen` capability and never falls back to the camera; this refactor does not implement the planned high-throughput binary firmware protocol.
+- Clean up subscriptions, pending work and transports on connection failure or session loss, and isolate event-listener exceptions from protocol delivery.
+
+The earlier v3 extraction existed only inside repository development history; it was not an npm release of this package. Version 0.1.0 is the first public v4-only package.

@@ -35,7 +35,7 @@
 #define ESP_VISION_CAMERA_PPA_OUTPUT_QVGA_HEIGHT    (240)
 #define ESP_VISION_CAMERA_PPA_OUTPUT_VGA_WIDTH      (640)
 #define ESP_VISION_CAMERA_PPA_OUTPUT_VGA_HEIGHT     (480)
-#define ESP_VISION_CAMERA_BUFFER_COUNT              (3)
+#define ESP_VISION_CAMERA_BUFFER_COUNT              (2)
 #define ESP_VISION_CAMERA_SCCB_I2C_PORT             (0)
 #define ESP_VISION_CAMERA_SCCB_I2C_SCL_PIN          (1)
 #define ESP_VISION_CAMERA_SCCB_I2C_SDA_PIN          (0)
@@ -70,5 +70,17 @@
 #define ESP_VISION_LCD_PIN_CS                       (49)
 #define ESP_VISION_LCD_PIN_RST                      (48)
 #define ESP_VISION_LCD_PIN_POWER                    (7)
+
+/* EV-MUX v4 physical defaults and background Wi-Fi/TCP policy.
+ * Native/Hosted WLAN is enabled separately in the port/IDF configuration.
+ * Factory credentials apply only when no saved NVS profile exists.
+ */
+#define ESP_VISION_ENABLE_BACKGROUND_NETWORK       (1)
+#define ESP_VISION_WIFI_DEFAULT_SSID                ""
+#define ESP_VISION_WIFI_DEFAULT_PASSWORD            ""
+#define ESP_VISION_TRANSPORT_DEFAULT_SINK          "usj"
+#define ESP_VISION_TRANSPORT_FALLBACK_SINK         "usj"
+#define ESP_VISION_ENABLE_TCP_TRANSPORT            (1)
+#define ESP_VISION_TCP_PORT                        (3232)
 
 #endif /* ESP_VISION_BOARD_CONFIG_H */

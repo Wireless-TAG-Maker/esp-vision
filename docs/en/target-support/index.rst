@@ -8,6 +8,12 @@ ESP-VISION documentation is built separately for each supported chip. Select the
 Supported Development Boards
 ----------------------------
 
+.. note::
+
+   Current standard prebuilt ESP32-P4 firmware supports silicon revisions v3.1–v3.99. This is the chip revision reported by esptool, not a board or module silkscreen version. Check the exact image's revision bounds before flashing; a board name or a generic v3.x label alone is insufficient.
+
+   No prebuilt firmware is provided here for ESP32-P4 v1.3. Users who need it must build and validate their own firmware: select the matching board, enable ``CONFIG_ESP32P4_SELECTS_REV_LESS_V3`` in menuconfig, choose a minimum revision compatible with the chip, and rebuild both the bootloader and application. IDF's pre-v3 and v3.x targets are mutually incompatible. Do not force-flash a v3.x image or patch its revision header to bypass checks.
+
 .. include:: _generated/boards.rst
 
 Chip Versus Board Capabilities
@@ -27,3 +33,10 @@ The current board headers disable Bluetooth and ESP-NOW; the S31 board additiona
 Because these conditions are not determined solely by the chip, the chip selector filters the ESP-VISION API reference but does not represent a complete standard MicroPython module manifest. Build-environment compatibility details are maintained in the project README.
 
 The chip documentation describes the defaults shared by the current board profiles. A custom board or modified build option can therefore differ from the published chip page. When that happens, the firmware configuration is authoritative.
+
+WebREPL and EV-MUX Network Control
+----------------------------------
+
+Traditional MicroPython WebREPL is not supported by the current ESP-VISION EV-MUX runtime, including ESP-IDF v5.5.6 builds. Some builds enable WebSocket and the internal ``_webrepl`` component. The upstream ``webrepl`` Python service is absent from some board profiles, including ESP32_P4X_EYE; ESP32_S3_EYE includes it in its manifest. Neither its presence nor the compile flags establish terminal or file-transfer compatibility with EV-MUX.
+
+EV-MUX routes Python input, output and files through one authorized owner, with link, lease and VM-epoch checks. A traditional WebREPL ``dupterm`` service does not implement this ownership contract. Adding its Python package or mirroring raw terminal bytes is not a supported workaround. Use :doc:`../device-core/api` with a TCP transport for network control. The retained ``example/07-Network/00-WebREPL/webrepl.py`` entry exits with this explanation before changing Wi-Fi or opening a listener.

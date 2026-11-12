@@ -12,6 +12,7 @@ spec:
 stages:
   - check
   - build
+  - target_test
   - build_docs
   - deploy
   - post_deploy
@@ -24,6 +25,7 @@ workflow:
 
 variables:
   GIT_SUBMODULE_STRATEGY: none
+  CI_PYTHON_IMAGE: "python:3.11"
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   PRE_COMMIT_HOME: "$CI_PROJECT_DIR/.cache/pre-commit"
   ESP_DOCS_BUILD_IMAGE: "$CI_DOCKER_REGISTRY/esp-idf-doc-env-v5.5:1-1"
@@ -32,14 +34,20 @@ variables:
 
 include:
   - local: '.gitlab/ci/rules.yml'
+  - local: '.gitlab/ci/device-core.yml'
+  - local: '.gitlab/ci/host-tools.yml'
+  - local: '.gitlab/ci/plugin.yml'
+  - local: '.gitlab/ci/target_test.yml'
+  - local: '.gitlab/ci/mcp-runtime.yml'
   - local: '.gitlab/ci/docs.yml'
   - local: '.gitlab/ci/deploy.yml'
+  - local: '.gitlab/ci/mcp.yml'
 
 pre_commit:
   stage: check
   tags:
     - build
-  image: python:3.11-slim
+  image: $CI_PYTHON_IMAGE
   cache:
     key:
       files:
@@ -53,6 +61,8 @@ pre_commit:
     - python -m pip install --upgrade pip
     - python -m pip install pre-commit
   script:
+    - python tools/ci/check_repository_hygiene.py
+    - python -m unittest discover -s tools/tests -p 'test_repository_hygiene.py' -v
     - pre-commit run --all-files --show-diff-on-failure astyle_py
     - pre-commit run --all-files --show-diff-on-failure check-copyright
 
@@ -60,10 +70,25 @@ python_stubs:
   stage: check
   tags:
     - build
-  image: python:3.11-slim
+  image: $CI_PYTHON_IMAGE
   script:
     - python -m py_compile stubs/*.pyi
     - python -m py_compile idf_ext.py
+
+evmux_host_checks:
+  stage: check
+  tags:
+    - build
+  image: python:3.11-slim
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends ca-certificates git gcc g++ libc6-dev libssl-dev ffmpeg
+    - python -m pip install PyYAML Pillow esptool==5.6.0
+    - git submodule sync -- lib/micropython
+    - git submodule update --init --depth 1 lib/micropython
+  script:
+    - python -m unittest discover -s tools/tests -p 'test_*.py' -v
+    - python tools/ci/check_docs_format.py
 
 # Catch board-config drift early: build config.toml's [website] region from the
 # board configs without IDF/esptool (--dry-run). This exercises board_model and
@@ -73,7 +98,7 @@ launchpad_config_check:
   stage: check
   tags:
     - build
-  image: python:3.11-slim
+  image: $CI_PYTHON_IMAGE
   script:
     - python -m pip install --upgrade rtoml pyyaml
     - python tools/ci/launchpad/generate_launchpad.py --dry-run "${CI_COMMIT_TAG:-v0.0.0-dev}"
@@ -87,7 +112,7 @@ mcp_pack_check:
   stage: check
   tags:
     - build
-  image: python:3.11-slim
+  image: $CI_PYTHON_IMAGE
   script:
     - python -m pip install --upgrade jsonschema
     - python docs/gen_mcp.py "${CI_COMMIT_TAG:-v0.0.0-dev}" --dry-run --out mcp-pack.dry.json
@@ -99,7 +124,7 @@ check_readme_links:
   stage: check
   tags:
     - build
-  image: python:3.11-slim
+  image: $CI_PYTHON_IMAGE
   allow_failure: true
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
@@ -113,6 +138,9 @@ check_readme_links:
 .firmware_base:
   stage: build
   extends: .rules:build:firmware
+  # Firmware consumes no npm artifacts; keep native build validation independent
+  # of the internet-tagged Node runner queue. SDK checks still gate the pipeline.
+  needs: [pre_commit, python_stubs, evmux_host_checks]
   tags:
     - build
   variables:
@@ -143,11 +171,24 @@ check_readme_links:
     - echo "ninja wrapper active -> $REAL_NINJA -j ${NINJA_MAX_JOBS:-2}"
   script:
     - idf.py --board "$BOARD" build
+    - python tools/ci/launchpad/build_identity.py "$BOARD" "$CI_COMMIT_SHA"
   after_script:
     - |
       if [ -d "build/$BOARD" ]; then
         find "build/$BOARD" -path '*/log/idf_py_*_output_*' -type f ! -name '*.txt' | while IFS= read -r log; do
           mv "$log" "$log.txt"
+        done
+      fi
+    - |
+      if [ "$BOARD" = "ESP32_P4X_EYE" ]; then
+        for app_elf in "build/$BOARD"/idf*/*.elf; do
+          [ -f "$app_elf" ] || continue
+          board_build="${app_elf%/*}"
+          mkdir -p "$board_build/debug"
+          for diagnostic in "$app_elf" "$board_build"/*.map "$board_build/sdkconfig"; do
+            [ -f "$diagnostic" ] || continue
+            cp "$diagnostic" "$board_build/debug/"
+          done
         done
       fi
   artifacts:
@@ -162,18 +203,28 @@ check_readme_links:
       # the rename). flash_args below remains the authority for which image is
       # consumed by the release packer.
       - build/$BOARD/idf*/*.bin
+      # P4-EYE boot failures need symbols from the same CI image. Keep the
+      # ELF, linker map, and effective configuration without requiring a
+      # separate local firmware build.
+      - build/$BOARD/idf*/debug/
       # flash_args lists the {offset, file} pairs consumed by `esptool merge-bin`
       # in the tag-release pack_launchpad job (see .gitlab/ci/deploy.yml). These
       # boards use a single factory app with no OTA, so flash_args references
       # only the three .bin files already collected above.
       - build/$BOARD/idf*/flash_args
+      # flasher_args.json carries the same offsets plus the chip and reset
+      # behaviour; the hardware test jobs flash straight from it.
+      - build/$BOARD/idf*/flasher_args.json
+      # Release metadata binds the published tag to this exact build version.
+      - build/$BOARD/idf*/project_description.json
+      - build/$BOARD/idf*/release-build-identity.json
 
-# Stable release lines (blocking): every board on every supported IDF release.
+# Qualified board/IDF pairs: P4/S3 use pinned v5.5.6; S31 requires v6.1.
 firmware:
   extends: .firmware_base
   parallel:
     matrix:
-      - IDF_IMAGE: ["release-v5.5", "release-v6.0", "release-v6.1"]
+      - IDF_IMAGE: ["v5.5.6"]
         BOARD:
           - ESP32_P4X_EYE
           - ESP32_P4X_FUNCTION_EV_BOARD

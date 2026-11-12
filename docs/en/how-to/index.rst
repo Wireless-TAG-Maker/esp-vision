@@ -8,9 +8,13 @@ Task-oriented guides for extending ESP-VISION.
 .. toctree::
    :maxdepth: 1
 
+   esp-vision-plugin
    add-python-module
+   contribute
    customize-firmware
+   publish-firmware
    add-model
    train-espdet-pico
    add-board
+   ev-mux-v4
    agent-code-generation

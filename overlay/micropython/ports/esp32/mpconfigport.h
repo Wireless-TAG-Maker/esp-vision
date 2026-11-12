@@ -203,6 +203,7 @@
 #define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT "mpy-esp32s31"
 #endif
 #endif
+#define MICROPY_PY_NETWORK_HOSTNAME_MAX_LEN (63)
 #define MICROPY_PY_NETWORK_INCLUDEFILE      "ports/esp32/modnetwork.h"
 #define MICROPY_PY_NETWORK_MODULE_GLOBALS_INCLUDEFILE "ports/esp32/modnetwork_globals.h"
 #ifndef MICROPY_PY_NETWORK_WLAN
@@ -345,11 +346,21 @@ void *esp_native_code_commit(void *, size_t, void *);
 #define MICROPY_PY_SOCKET_EVENTS_HANDLER
 #endif
 
+// Service at most one queued VM RPC at bytecode branch safe points. The
+// transport function itself gates dispatch to the main VM task and prevents
+// reentrant polling from Python callbacks.
+void ev_control_transport_vm_poll(void);
+#define MICROPY_VM_HOOK_LOOP \
+    do { \
+        ev_control_transport_vm_poll(); \
+    } while (0);
+
 #if MICROPY_PY_THREAD
 #define MICROPY_EVENT_POLL_HOOK \
     do { \
         mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS); \
         MICROPY_PY_SOCKET_EVENTS_HANDLER \
+        ev_control_transport_vm_poll(); \
         MP_THREAD_GIL_EXIT(); \
         ulTaskNotifyTake(pdFALSE, 1); \
         MP_THREAD_GIL_ENTER(); \
@@ -364,6 +375,7 @@ void *esp_native_code_commit(void *, size_t, void *);
     do { \
         mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS); \
         MICROPY_PY_SOCKET_EVENTS_HANDLER \
+        ev_control_transport_vm_poll(); \
             MICROPY_PY_WAIT_FOR_INTERRUPT; \
     } while (0);
 #endif
@@ -404,7 +416,7 @@ typedef long mp_off_t;
 
 #ifndef MICROPY_BOARD_ENTER_BOOTLOADER
 // RTC has a register to trigger bootloader on these targets
-#if CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C2 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32P4
+#if CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C2 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32P4 || CONFIG_IDF_TARGET_ESP32S31
 #define MICROPY_ESP32_USE_BOOTLOADER_RTC    (1)
 #define MICROPY_BOARD_ENTER_BOOTLOADER(nargs, args) machine_bootloader_rtc()
 #endif

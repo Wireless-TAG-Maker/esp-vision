@@ -123,7 +123,7 @@ const uint8_t *tud_descriptor_configuration_cb(uint8_t index) {
     if (usbd) {
         result = usbd_get_buffer_in_cb(usbd->desc_cfg, MP_BUFFER_READ);
     }
-    return result ? result : &mp_usbd_builtin_desc_cfg;
+    return result ? result : mp_usbd_builtin_configuration(false);
 }
 
 const char *mp_usbd_runtime_string_cb(uint8_t index) {
@@ -414,6 +414,9 @@ usbd_class_driver_t const *usbd_app_driver_get_cb(uint8_t *driver_count) {
 // This is called on any soft reset after boot.py runs, or on demand if the
 // user activates USB and it hasn't activated yet.
 void mp_usbd_init(void) {
+    // Also initialize when runtime USB is inactive: the EV transport's CDC
+    // connection snapshot uses the shared lock even before TinyUSB is active.
+    mp_usbd_lock_init();
     mp_obj_usb_device_t *usbd = MP_OBJ_TO_PTR(MP_STATE_VM(usbd));
     bool need_usb;
 

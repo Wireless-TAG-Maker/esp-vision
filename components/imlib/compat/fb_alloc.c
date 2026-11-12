@@ -11,6 +11,7 @@
 
 #include "fb_alloc.h"
 #include "omv_common.h"
+#include "ev_memory.h"
 
 typedef struct _omv_fb_alloc_node_t {
     struct _omv_fb_alloc_node_t *prev;
@@ -23,35 +24,18 @@ typedef struct _omv_fb_alloc_node_t {
 
 static omv_fb_alloc_node_t *omv_fb_alloc_head = NULL;
 
-static void *omv_fb_raw_alloc_with_caps(size_t size, uint32_t caps) {
-    return heap_caps_malloc(size, caps);
-}
-
 static void *omv_fb_raw_alloc(size_t size, int hints) {
-    void *ptr = NULL;
-
     if (hints & FB_ALLOC_PREFER_INTERNAL) {
-        ptr = omv_fb_raw_alloc_with_caps(size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (ptr == NULL) {
-            ptr = omv_fb_raw_alloc_with_caps(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        }
+        return esp_vision_memory_malloc_preferred(size,
+                                                  MALLOC_CAP_8BIT,
+                                                  ESP_VISION_MEMORY_PREFER_INTERNAL);
     } else if (hints & FB_ALLOC_PREFER_SIZE) {
-        ptr = omv_fb_raw_alloc_with_caps(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (ptr == NULL) {
-            ptr = omv_fb_raw_alloc_with_caps(size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        }
-    } else {
-        ptr = omv_fb_raw_alloc_with_caps(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (ptr == NULL) {
-            ptr = omv_fb_raw_alloc_with_caps(size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        }
+        return esp_vision_memory_malloc_preferred(size,
+                                                  MALLOC_CAP_8BIT,
+                                                  ESP_VISION_MEMORY_PREFER_SPIRAM);
     }
 
-    if (ptr == NULL) {
-        ptr = omv_fb_raw_alloc_with_caps(size, MALLOC_CAP_8BIT);
-    }
-
-    return ptr;
+    return esp_vision_memory_malloc(size, MALLOC_CAP_8BIT);
 }
 
 static size_t omv_fb_largest_free_block_with_caps(uint32_t caps) {
@@ -85,6 +69,18 @@ static NORETURN void omv_fb_alloc_oom(void) {
     mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("Out of fast frame buffer stack memory"));
 }
 
+static omv_fb_alloc_node_t *omv_fb_alloc_node(void) {
+    // GC does not trace this static chain. Native nodes also remain valid when
+    // fb_alloc_init0() releases buffers after the VM heap has been rebuilt.
+    omv_fb_alloc_node_t *node = esp_vision_memory_malloc_preferred(sizeof(*node),
+                                                                  MALLOC_CAP_8BIT,
+                                                                  ESP_VISION_MEMORY_PREFER_INTERNAL);
+    if (node == NULL) {
+        omv_fb_alloc_oom();
+    }
+    return node;
+}
+
 char *fb_alloc_sp() {
     return NULL;
 }
@@ -106,7 +102,7 @@ uint32_t fb_avail() {
 }
 
 void fb_alloc_mark() {
-    omv_fb_alloc_node_t *node = m_new_obj(omv_fb_alloc_node_t);
+    omv_fb_alloc_node_t *node = omv_fb_alloc_node();
     node->prev = omv_fb_alloc_head;
     node->raw_ptr = NULL;
     node->ptr = NULL;
@@ -119,19 +115,20 @@ void fb_alloc_mark() {
 static void omv_fb_alloc_pop_until_mark(bool free_permanent) {
     while (omv_fb_alloc_head != NULL) {
         omv_fb_alloc_node_t *node = omv_fb_alloc_head;
+        // ImageIO makes the data node permanent, not the preceding scope mark.
+        // Ordinary scope cleanup must retain both the node and its buffer.
+        if (node->permanent && !free_permanent) {
+            return;
+        }
         omv_fb_alloc_head = node->prev;
 
         if (node->raw_ptr != NULL) {
             heap_caps_free(node->raw_ptr);
         }
 
-        bool stop = node->mark && (!node->permanent || free_permanent);
-        if (node->mark && node->permanent && !free_permanent) {
-            omv_fb_alloc_head = node;
-            return;
-        }
+        bool stop = node->mark;
 
-        m_free(node);
+        heap_caps_free(node);
 
         if (stop) {
             return;
@@ -158,7 +155,7 @@ void *fb_alloc(uint32_t size, int hints) {
         return NULL;
     }
 
-    omv_fb_alloc_node_t *node = m_new_obj(omv_fb_alloc_node_t);
+    omv_fb_alloc_node_t *node = omv_fb_alloc_node();
     uint32_t alloc_size = OMV_ALIGN_TO(size, OMV_ALLOC_ALIGNMENT);
     alloc_size += OMV_ALLOC_ALIGNMENT - 1;
     node->prev = omv_fb_alloc_head;
@@ -170,7 +167,7 @@ void *fb_alloc(uint32_t size, int hints) {
     node->permanent = 0;
 
     if (node->raw_ptr == NULL) {
-        m_free(node);
+        heap_caps_free(node);
         omv_fb_alloc_oom();
     }
 
@@ -232,7 +229,24 @@ void fb_free() {
     if (node->raw_ptr != NULL) {
         heap_caps_free(node->raw_ptr);
     }
-    m_free(node);
+    heap_caps_free(node);
+}
+
+void fb_free_buffer(void *ptr) {
+    if (ptr == NULL) {
+        return;
+    }
+    omv_fb_alloc_node_t **link = &omv_fb_alloc_head;
+    while (*link != NULL) {
+        omv_fb_alloc_node_t *node = *link;
+        if (node->ptr == ptr && !node->mark && !node->permanent) {
+            *link = node->prev;
+            heap_caps_free(node->raw_ptr);
+            heap_caps_free(node);
+            return;
+        }
+        link = &node->prev;
+    }
 }
 
 void fb_free_all() {
