@@ -73,7 +73,7 @@ The following table lists the direct dependencies most relevant to redistributio
      - ST7102 MIPI-DSI panel driver
      - Apache-2.0 (verified per source file in 1.0.0)
    * - `WT_BSP 9d1050d <https://github.com/Wireless-TAG-Maker/WT_BSP/tree/9d1050d0957aaa050e635ff1f22a686881e54444>`__
-     - ``boards/ESP32_WT9932P4C61_TINY/bmgr/st7102_init.h``
+     - ``boards/WT9932P4C61_TINY/bmgr/st7102_init.h``
      - 480x640 panel command table; original source notice retained
      - Apache-2.0
 

@@ -8,7 +8,7 @@
 #define ESP_VISION_BOARD_CONFIG_H
 
 #define ESP_VISION_BOARD_ARCH                  "ESP32P4"
-#define ESP_VISION_BOARD_TYPE                  "ESP32_WT9932P4C61_TINY"
+#define ESP_VISION_BOARD_TYPE                  "WT9932P4C61_TINY"
 #define ESP_VISION_PORT_ESP32                       (1)
 
 #define ESP_VISION_IMLIB_PROFILER_ENABLE            (0)

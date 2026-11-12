@@ -180,7 +180,7 @@ def run(port, require_sd=False):
                 line, output = output.split('\n', 1)
                 if line.startswith('WT_BEGIN '):
                     print(line.strip(), flush=True)
-                if results and 'ESP-VISION ESP32_WT9932P4C61_TINY ready' in line:
+                if results and 'ESP-VISION WT9932P4C61_TINY ready' in line:
                     raise RuntimeError('board restarted during hardware tests')
                 if line.startswith('WT_RESULT '):
                     result = json.loads(line[len('WT_RESULT '):])

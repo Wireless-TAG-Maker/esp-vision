@@ -73,7 +73,7 @@ ESP-VISION 自有代码（``platform/``、大部分 ``modules/``、``boards/`` �
      - ST7102 MIPI-DSI 屏幕驱动
      - Apache-2.0（已逐一核对 1.0.0 源文件）
    * - `WT_BSP 9d1050d <https://github.com/Wireless-TAG-Maker/WT_BSP/tree/9d1050d0957aaa050e635ff1f22a686881e54444>`__
-     - ``boards/ESP32_WT9932P4C61_TINY/bmgr/st7102_init.h``
+     - ``boards/WT9932P4C61_TINY/bmgr/st7102_init.h``
      - 480x640 屏幕命令表，保留原始版权声明
      - Apache-2.0
 

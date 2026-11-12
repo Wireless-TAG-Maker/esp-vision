@@ -77,7 +77,7 @@ idf.py --board ESP32_P4X_EYE -p /dev/ttyACM0 build flash monitor
 
 ## WT9932P4C61-TINY
 
-Use `idf.py --board ESP32_WT9932P4C61_TINY build` with ESP-IDF 6.0. See the [board guide](boards/ESP32_WT9932P4C61_TINY/port/board.md) for wiring, USB ports, and ESP32-C61 slave firmware requirements.
+Use `idf.py --board WT9932P4C61_TINY build` with ESP-IDF 6.0. See the [board guide](boards/WT9932P4C61_TINY/port/board.md) for wiring, USB ports, and ESP32-C61 slave firmware requirements.
 
 | Board-specific dependency | Purpose | License |
 | --- | --- | --- |

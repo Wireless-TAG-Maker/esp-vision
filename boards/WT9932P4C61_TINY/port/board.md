@@ -1,8 +1,8 @@
 # WT9932P4C61-TINY
 
-Build this Wireless-Tag board with `idf.py --board ESP32_WT9932P4C61_TINY build`. The firmware runs on the ESP32-P4 (revision 3.1 or later), using 16 MiB Flash and external PSRAM at 200 MHz. ESP-IDF 6.0 is the bring-up toolchain.
+Build this Wireless-Tag board with `idf.py --board WT9932P4C61_TINY build`. The firmware runs on the ESP32-P4 (revision 3.1 or later), using 16 MiB Flash and external PSRAM at 200 MHz. ESP-IDF 6.0 is the bring-up toolchain.
 
-Connect **FUSB** to flash or monitor the P4 USB-Serial/JTAG port. **HUSB** exposes the ESP-VISION USB-OTG CDC and Flash/SD MSC interfaces. Use the port reported by the host with `idf.py --board ESP32_WT9932P4C61_TINY -p PORT flash monitor`.
+Connect **FUSB** to flash or monitor the P4 USB-Serial/JTAG port. **HUSB** exposes the ESP-VISION USB-OTG CDC and Flash/SD MSC interfaces. Use the port reported by the host with `idf.py --board WT9932P4C61_TINY -p PORT flash monitor`.
 
 For the [ESP-VISION Web IDE](https://ide.vision.espressif.com/), connect HUSB and select its `ESP-VISION CDC` serial port in a browser with Web Serial support. When running the browser on Windows, HUSB must be attached to Windows rather than forwarded to WSL through USB/IP; FUSB can remain in WSL for flashing. Connecting the IDE stops the running Python script. Wait until the intended file is active in the editor before saving or running it.
 

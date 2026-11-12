@@ -7,7 +7,7 @@ import display
 import sensor
 import time
 
-print("ESP-VISION ESP32_WT9932P4C61_TINY ready")
+print("ESP-VISION WT9932P4C61_TINY ready")
 
 lcd = None
 try:
@@ -34,7 +34,7 @@ finally:
 """
 
 README_TXT = """\
-ESP-VISION ESP32_WT9932P4C61_TINY
+ESP-VISION WT9932P4C61_TINY
 
 Edit main.py to run your Python vision script.
 Use the ESP-VISION VSCode extension to run scripts and preview frames.
