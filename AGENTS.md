@@ -50,7 +50,7 @@ A board is defined in a single tree, `boards/<BOARD>/`: the ESP-VISION side at t
 ## Code Style & Conventions
 
 - Public Python module names stay OpenMV-compatible: the camera module is `sensor` (not `camera`); `image`, `display`, `espdl` alongside, with the codec stream exposed as `image.ImageIO`.
-- `omv_*` prefixes only appear under `components/imlib/upstream|include/`. `platform/` and `modules/` use ESP-VISION names. Board names stay `ESP32_*` UPPER_SNAKE, aligned with `MICROPY_BOARD`.
+- `omv_*` prefixes only appear under `components/imlib/upstream|include/`. `platform/` and `modules/` use ESP-VISION names. Keep board directory names aligned with `MICROPY_BOARD`. Use `ESP32_*` for Espressif board IDs and `WT9932*` for Wireless-Tag board IDs.
 - Bindings (`modules/`) only do object conversion + light API adaptation; push heavy logic into pure C or `platform/`.
 - Code touching DMA, PSRAM, cache coherency, PPA, or USB CDC/MSC must handle error paths explicitly. Avoid dynamic allocation on hot paths — reuse the framebuffer / `fb_alloc` / lifetime-scoped buffers.
 - Prefer changes via `overlay/` and `USER_C_MODULES` over editing `lib/micropython/`; only patch the submodule when genuinely unavoidable.

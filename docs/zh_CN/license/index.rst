@@ -65,7 +65,7 @@ ESP-VISION 自有代码（``platform/``、大部分 ``modules/``、``boards/`` �
      - 构建系统、驱动和媒体组件
      - Apache-2.0
    * - Wireless-Tag GC2145 UXGA 辅助代码
-     - ``boards/ESP32_WT9932S31_TINY/gc2145_uxga.c`` 和 ``.h``
+     - ``boards/WT9932S31_TINY/gc2145_uxga.c`` 和 ``.h``
      - 基于摄像头参考工程的 UYVY 配置；保留原始声明
      - Apache-2.0
 

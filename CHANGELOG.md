@@ -6,8 +6,12 @@ All notable changes to ESP-VISION are recorded here. The format follows [Keep a 
 
 ### Added
 
-- Added the `ESP32_WT9932S31_TINY` board profile for Wireless-Tag WT9932S31-TINY, with GC2145 DVP camera configuration, USB preview, native USB CDC/MSC, and four-bit SDMMC storage using the S31's fixed 1.8 V IO LDO. The port uses the existing ESP-IDF 6.1 dependency overlay and explicitly selects Newlib for C stdout/stderr routing through EV-MUX.
+- Added the `WT9932S31_TINY` board profile for Wireless-Tag WT9932S31-TINY, with GC2145 DVP camera configuration, USB preview, native USB CDC/MSC, and four-bit SDMMC storage using the S31's fixed 1.8 V IO LDO. The port uses the existing ESP-IDF 6.1 dependency overlay and explicitly selects Newlib for C stdout/stderr routing through EV-MUX.
 - Added a WT9932S31-TINY hardware smoke test covering camera formats and repeated startup, PSRAM, Flash/SD readback after idle, Wi-Fi scanning, and board GPIO access, with PSRAM heap traversal checks, exclusive temporary files, and startup serial synchronization.
+
+### Changed
+
+- Renamed the WT9932S31-TINY build target to `WT9932S31_TINY` and its Board Manager ID to `wt9932s31_tiny`.
 
 ### Fixed
 

@@ -1,6 +1,6 @@
 # WT9932S31-TINY
 
-Build with ESP-IDF `release/v6.1` using `idf.py --board ESP32_WT9932S31_TINY build`. This profile targets the WT9932S31-TINY board with a GC2145 DVP camera and 16 MiB Flash. ESP-IDF detects the PSRAM capacity from the memory device; the board connected during bring-up reported 32 MiB. The startup memory test and 2 MiB page-pattern smoke check sample memory and do not constitute an independent full-capacity test. It uses the repository's existing S31 dependency overlay. ESP-IDF 6.2 was used by the reference projects; this port uses 6.1 for compatibility with the other S31 boards.
+Build with ESP-IDF `release/v6.1` using `idf.py --board WT9932S31_TINY build`. This profile targets the WT9932S31-TINY board with a GC2145 DVP camera and 16 MiB Flash. ESP-IDF detects the PSRAM capacity from the memory device; the board connected during bring-up reported 32 MiB. The startup memory test and 2 MiB page-pattern smoke check sample memory and do not constitute an independent full-capacity test. It uses the repository's existing S31 dependency overlay. ESP-IDF 6.2 was used by the reference projects; this port uses 6.1 for compatibility with the other S31 boards.
 
 | Function | Configuration |
 | --- | --- |

@@ -77,7 +77,7 @@ idf.py --board ESP32_P4X_EYE -p /dev/ttyACM0 build flash monitor
 
 ## WT9932S31-TINY
 
-Use `idf.py --board ESP32_WT9932S31_TINY build` with ESP-IDF release/v6.1. See the [board guide](boards/ESP32_WT9932S31_TINY/port/board.md) for the GC2145 camera, SD storage, USB connections, and memory constraints.
+Use `idf.py --board WT9932S31_TINY build` with ESP-IDF release/v6.1. See the [board guide](boards/WT9932S31_TINY/port/board.md) for the GC2145 camera, SD storage, USB connections, and memory constraints.
 
 | Board-specific source | Purpose | License |
 | --- | --- | --- |

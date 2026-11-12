@@ -5,7 +5,7 @@ MAIN_PY = """\
 import sensor
 import time
 
-print("ESP-VISION ESP32_WT9932S31_TINY ready")
+print("ESP-VISION WT9932S31_TINY ready")
 
 try:
     sensor.reset()
@@ -21,7 +21,7 @@ finally:
 """
 
 README_TXT = """\
-ESP-VISION ESP32_WT9932S31_TINY
+ESP-VISION WT9932S31_TINY
 
 Edit main.py to run your Python vision script.
 The default main.py sends a GC2145 camera preview over USB.
