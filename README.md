@@ -84,6 +84,10 @@ idf.py --board ESP32_P4X_EYE -p /dev/ttyACM0 build flash monitor
 
 > Note: When building on Windows, install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) so the build can create MicroPython's host-side `mpy-cross.exe`. In the Visual Studio Build Tools installer, select the "Desktop development with C++" workload and make sure the "MSVC v143 - VS 2022 C++ x64/x86 build tools" component is selected.
 
+### WT9932P4X-TINY
+
+For the Wireless-Tag board with ESP32-P4 v3.x, use ESP-IDF v5.5.6 and run `idf.py --board WT9932P4X_TINY build`. See the [board guide](boards/WT9932P4X_TINY/port/board.md) for peripherals and USB ports.
+
 ## ESP-IDF Compatibility
 
 CI builds and published firmware use the following board/IDF combinations:

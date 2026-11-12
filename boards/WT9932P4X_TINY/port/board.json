@@ -1,0 +1,20 @@
+{
+    "deploy": [
+        "../deploy.md"
+    ],
+    "docs": "",
+    "features": [
+        "MIPI_CSI",
+        "SC2336",
+        "MIPI_DSI",
+        "ST7102",
+        "ST7123",
+        "SDMMC",
+        "USB_OTG"
+    ],
+    "mcu": "esp32p4x",
+    "product": "WT9932P4X-TINY",
+    "thumbnail": "",
+    "url": "https://github.com/Wireless-TAG-Maker/WT_BSP/tree/c4962c2a8d69117f27f8a8db9b031fced45b63a9/components/wt_bsp/boards/WT9932P4X-TINY",
+    "vendor": "Wireless-Tag"
+}

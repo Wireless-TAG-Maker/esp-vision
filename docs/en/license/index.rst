@@ -100,6 +100,18 @@ The following table lists the direct dependencies most relevant to redistributio
      - Component Registry
      - Camera driver
      - Apache-2.0
+   * - Wireless-Tag ST7102 panel initialization
+     - ``boards/WT9932P4X_TINY/bmgr/st7102_init.h``, from WT_BSP commit ``c4962c2``
+     - 480×640 LCD command sequence with the original Wireless-Tag notice
+     - Apache-2.0
+   * - `esp_lcd_st7102 <https://components.espressif.com/components/kevincoooool/esp_lcd_st7102/versions/1.0.0>`__ 1.0.0
+     - Component Registry
+     - ST7102 MIPI-DSI panel driver
+     - Apache-2.0
+   * - `esp_lcd_touch_st7123 <https://components.espressif.com/components/espressif/esp_lcd_touch_st7123/versions/1.0.2>`__ 1.0.2
+     - Component Registry
+     - ST7123 I2C touch controller driver
+     - Apache-2.0
    * - `ESP-IDF <https://github.com/espressif/esp-idf>`__
      - External SDK
      - Build system, drivers, and media components

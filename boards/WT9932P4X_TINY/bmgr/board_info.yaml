@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
+# SPDX-License-Identifier: Apache-2.0
+
+board: wt9932p4x_tiny
+chip: esp32p4
+version: 1.0.0
+description: "WT9932P4X-TINY"
+manufacturer: "Wireless-Tag"

@@ -228,6 +228,7 @@ firmware:
         BOARD:
           - ESP32_P4X_EYE
           - ESP32_P4X_FUNCTION_EV_BOARD
+          - WT9932P4X_TINY
           - ESP32_P4X_VISION
           - ESP32_S3_EYE
           - AtomS3R-M12

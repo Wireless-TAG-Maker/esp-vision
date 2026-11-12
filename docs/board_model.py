@@ -30,6 +30,7 @@ WEBSITE_STATIC_PREFIX = (
 )
 
 BOARD_IMAGES = {
+    'WT9932P4X_TINY': '../../_static/ESP-VISION_logo.svg',
     'ESP32_P4X_EYE': (
         'https://raw.githubusercontent.com/espressif/esp-dev-kits/master/'
         'docs/_static/esp32-p4-eye/esp32-p4-eye-isometric.png'
@@ -141,14 +142,16 @@ def board_info(board, target):
     metadata = json.loads(
         (MP_BOARD_ROOT / board / 'port' / 'board.json').read_text(encoding='utf-8')
     )
-    port_macros = _defined_macros(MP_CONFIG_PORT)
-    port_macros.update(_defined_macros(MP_BOARD_ROOT / board / 'port' / 'mpconfigboard.h'))
+    board_header = MP_BOARD_ROOT / board / 'port' / 'mpconfigboard.h'
+    disabled_macros = set(re.findall(
+        r'^\s*#define[ \t]+(\w+)[ \t]+\(?0\)?[ \t]*(?://.*)?$',
+        board_header.read_text(encoding='utf-8'),
+        re.MULTILINE,
+    ))
+    port_macros = (_defined_macros(MP_CONFIG_PORT) | _defined_macros(board_header)) - disabled_macros
     imlib_macros = _defined_macros(BOARD_ROOT / board / 'imlib_config.h')
     modules = TARGET_CAPABILITIES[target]['modules']
-    if any(re.search(r'#define\s+' + name + r'\s+\(?0\)?\s*(?://.*)?$',
-                     (MP_BOARD_ROOT / board / 'port' / 'mpconfigboard.h').read_text(),
-                     re.MULTILINE)
-           for name in ('MICROPY_HW_ENABLE_USBDEV', 'MICROPY_HW_USB_UVC')):
+    if disabled_macros & {'MICROPY_HW_ENABLE_USBDEV', 'MICROPY_HW_USB_UVC'}:
         modules = tuple(module for module in modules if module != 'uvc')
     if board in TARGET_CAPABILITIES[target]['barcode_boards']:
         modules = modules + ('barcode',)

@@ -6,6 +6,8 @@ All notable changes to ESP-VISION are recorded here. The format follows [Keep a 
 
 ### Added
 
+- Add the `WT9932P4X_TINY` board profile for Wireless-Tag WT9932P4X-TINY (ESP32-P4 v3.x), with SC2336 CSI capture, ST7102 DSI display, ST7123 touch, four-bit SDMMC and USB device support.
+
 - Add a bilingual AI development guide at `how-to/esp-vision-plugin` with goal-focused prompts, assistant setup and marketplace installation, first-use firmware download and flashing, Python vision applications, Wi-Fi development, USB camera output and conversational iteration. Include a bilingual first-time Wi-Fi setup walkthrough covering website, AI-assisted and CLI provisioning over USB, connection verification, LAN access and troubleshooting.
 
 - Add SC101IOT DVP camera support on ESP32_S31_MOSAICO alongside OV3640.

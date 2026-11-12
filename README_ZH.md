@@ -84,6 +84,10 @@ idf.py --board ESP32_P4X_EYE -p /dev/ttyACM0 build flash monitor
 
 > 注意：在 Windows 平台编译时，需要安装 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)，用于生成 MicroPython 主机侧工具 `mpy-cross.exe`。在 Visual Studio Build Tools 安装器中，请勾选 “Desktop development with C++”（使用 C++ 的桌面开发）工作负载，并确认已勾选 “MSVC v143 - VS 2022 C++ x64/x86 build tools” 组件。
 
+### WT9932P4X-TINY
+
+启明云端 ESP32-P4 v3.x 开发板使用 ESP-IDF v5.5.6，执行 `idf.py --board WT9932P4X_TINY build`。外设和 USB 接口见[板级说明](boards/WT9932P4X_TINY/port/board.md)。
+
 ## ESP-IDF 兼容性
 
 CI 构建和发布固件使用以下开发板与 IDF 组合：

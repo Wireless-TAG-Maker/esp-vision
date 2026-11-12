@@ -100,6 +100,18 @@ ESP-VISION 自有代码（``platform/``、大部分 ``modules/``、``boards/`` �
      - Component Registry
      - 相机驱动
      - Apache-2.0
+   * - 启明云端 ST7102 屏幕初始化
+     - ``boards/WT9932P4X_TINY/bmgr/st7102_init.h``，来源为 WT_BSP 提交 ``c4962c2``
+     - 480×640 LCD 初始化命令，保留启明云端原始版权声明
+     - Apache-2.0
+   * - `esp_lcd_st7102 <https://components.espressif.com/components/kevincoooool/esp_lcd_st7102/versions/1.0.0>`__ 1.0.0
+     - Component Registry
+     - ST7102 MIPI-DSI 屏幕驱动
+     - Apache-2.0
+   * - `esp_lcd_touch_st7123 <https://components.espressif.com/components/espressif/esp_lcd_touch_st7123/versions/1.0.2>`__ 1.0.2
+     - Component Registry
+     - ST7123 I2C 触控控制器驱动
+     - Apache-2.0
    * - `ESP-IDF <https://github.com/espressif/esp-idf>`__
      - 外部 SDK
      - 构建系统、驱动和媒体组件
